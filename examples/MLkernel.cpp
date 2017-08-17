@@ -63,7 +63,7 @@ inline double norm1(double* x, double* y, int d) {
 }
 
 inline double Gauss_kernel(double* x, double* y, int d, double h) {
-  return exp(-dist2(x, y, d)/(h*h));
+  return exp(-dist2(x, y, d)/(2*h*h));
 }
 
 inline double Laplace_kernel(double* x, double* y, int d, double h) {
