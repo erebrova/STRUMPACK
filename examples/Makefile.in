@@ -94,6 +94,16 @@ MLkernel: MLkernel.cpp
 	$(CXX) $(LDFLAGS) MLkernel.o -o $@ $(LIBS)
 	$(RM) MLkernel.o
 
+KernelMatrixCompression: KernelMatrixCompression.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelMatrixCompression.o
+	$(CXX) $(LDFLAGS) KernelMatrixCompression.o -o $@ $(LIBS)
+	$(RM) KernelMatrixCompression.o
+
+KernelRegression: KernelRegression.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelRegression.o
+	$(CXX) $(LDFLAGS) KernelRegression.o -o $@ $(LIBS)
+	$(RM) KernelRegression.o
+
 clean:
 	rm -f *~ *o sexample dexample cexample zexample testPoisson2d	\
 		testPoisson3d testPoisson2dMPI testPoisson2dMPIDist	\

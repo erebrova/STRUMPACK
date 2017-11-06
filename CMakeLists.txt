@@ -296,6 +296,10 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
   ${CMAKE_BINARY_DIR}/examples/bin2mtx.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
   ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/KernelMatrixCompression.cpp
+  ${CMAKE_BINARY_DIR}/examples/KernelMatrixCompression.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression.cpp
+  ${CMAKE_BINARY_DIR}/examples/KernelRegression.cpp COPYONLY)
 
 
 include(CTest)
