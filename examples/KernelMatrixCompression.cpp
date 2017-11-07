@@ -238,6 +238,7 @@ void k_means(int k, double* p, int n, int d, int* nc) {
   for (int i = 0; i < k; i++) delete[] center[i];
   delete[] center;
   delete[] cluster;
+  delete[] ind_centers;
 }
 
 void recursive_2_means(double* p, int n, int d, int cluster_size,
@@ -324,7 +325,8 @@ void kd_partition(double* p, int n, int d, int* nc) {
   copy(p_perm, p_perm + n * d, p);
   delete[] p_perm;
   delete[] ci;
-
+  delete[] maxes;
+  delete[] mins;
   delete[] cluster;
 }
 
@@ -396,17 +398,13 @@ int main(int argc, char* argv[]) {
     recursive_kd(data.data(), n, d, cluster_size, cluster_tree);
     cout << "kd " << endl;
   }
-
   cout << "constructing Kdense .. " << endl;
-
   DenseMatrix<double> Kdense(n, n);
   if (kernel == 1) {
-#pragma omp parallel for collapse(2)
     for (int c = 0; c < n; c++)
       for (int r = 0; r < n; r++)
         Kdense(r, c) = Gauss_kernel(&data[r * d], &data[c * d], d, h);
   } else {
-#pragma omp parallel for collapse(2)
     for (int c = 0; c < n; c++)
       for (int r = 0; r < n; r++)
         Kdense(r, c) = Laplace_kernel(&data[r * d], &data[c * d], d, h);
@@ -443,22 +441,12 @@ int main(int argc, char* argv[]) {
   cout << "# memory(K) = " << K.memory() / 1e6 << " MB, "
        << 100. * K.memory() / Kdense.memory() << "% of dense" << endl;
 
-  // solve test
-  auto ULV = K.factor();
-
-  DenseMatrix<double> B(n, 1);
-  DenseMatrix<double> C(B);
-
-  K.solve(ULV, C);
-  auto Bcheck = K.apply(C);
-  Bcheck.scaled_add(-1., B);
-  cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
-       << Bcheck.normF() / B.normF() << endl;
-
   auto Ktest = K.dense();
   Ktest.scaled_add(-1., Kdense);
-  cout << "# relative error = ||Kdense-K*I||_F/||Kdense||_F = "
-       << Ktest.normF() / Kdense.normF() << endl;
+  if (Kdense.normF() != 0) {
+    cout << "# relative error = ||Kdense-K*I||_F/||Kdense||_F = "
+         << Ktest.normF() / Kdense.normF() << endl;
+  }
   if (Ktest.normF() / Kdense.normF() >
       ERROR_TOLERANCE * max(hss_opts.rel_tol(), hss_opts.abs_tol())) {
     cout << "ERROR: compression error too big!!" << endl;

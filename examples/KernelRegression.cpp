@@ -240,6 +240,7 @@ void k_means(int k, double* p, int n, int d, int* nc, double* labels) {
   for (int i = 0; i < k; i++) delete[] center[i];
   delete[] center;
   delete[] cluster;
+  delete[] ind_centers;
 }
 
 void recursive_2_means(double* p, int n, int d, int cluster_size,
@@ -331,7 +332,8 @@ void kd_partition(double* p, int n, int d, int* nc, double* labels) {
   delete[] p_perm;
   delete[] labels_perm;
   delete[] ci;
-
+  delete[] maxes;
+  delete[] mins;
   delete[] cluster;
 }
 
@@ -419,13 +421,11 @@ int main(int argc, char* argv[]) {
 
   DenseMatrix<double> Kdense(n, n);
   if (kernel == 1) {
-#pragma omp parallel for collapse(2)
     for (int c = 0; c < n; c++)
       for (int r = 0; r < n; r++)
         Kdense(r, c) =
             Gauss_kernel(&data_train[r * d], &data_train[c * d], d, h);
   } else {
-#pragma omp parallel for collapse(2)
     for (int c = 0; c < n; c++)
       for (int r = 0; r < n; r++)
         Kdense(r, c) =
@@ -475,21 +475,18 @@ int main(int argc, char* argv[]) {
   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
        << Bcheck.normF() / B.normF() << endl;
 
-  // DenseMatrix<double> Pdense(n, m);
   double* prediction = new double[m];
   for (int i = 0; i < m; ++i) {
     prediction[i] = 0;
   }
 
   if (kernel == 1) {
-    //#pragma omp parallel for collapse(2)
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
         prediction[c] +=
             Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
             weights(r, 0);
   } else {
-    //#pragma omp parallel for collapse(2)
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
         prediction[c] +=
