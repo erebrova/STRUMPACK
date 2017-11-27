@@ -24,8 +24,6 @@
  * Division).
  *
  */
-#include "HSS/HSSMatrix.hpp"
-#include "TaskTimer.hpp"
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -33,6 +31,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "HSS/HSSMatrix.hpp"
+#include "TaskTimer.hpp"
 
 using namespace std;
 using namespace strumpack;
@@ -62,7 +63,7 @@ inline double norm1(double *x, double *y, int d) {
 }
 
 inline double Gauss_kernel(double *x, double *y, int d, double h) {
-  return exp(-dist2(x, y, d) / (h * h));
+  return exp(-dist2(x, y, d) / (2. * h * h));
 }
 
 inline double Laplace_kernel(double *x, double *y, int d, double h) {
@@ -364,6 +365,7 @@ void recursive_kd(double *p, int n, int d, int cluster_size,
 
 class Kernel {
   using DenseM_t = DenseMatrix<double>;
+  using DenseMW_t = DenseMatrixWrapper<double>;
 
 public:
   vector<double> _data;
@@ -388,25 +390,58 @@ public:
 
   void times(DenseM_t &Rr, DenseM_t &Sr) {
     assert(Rr.rows() == _n);
-    double elem = 0.;
-    for (size_t i = 0; i < Sr.rows(); i++) {
-      for (size_t j = 0; j < Sr.cols(); j++) {
-        Sr(i, j) = 0.;
-      }
-    }
-    for (size_t i = 0; i < _n; i++) {
-      for (size_t s = 0; s < _n; s++) {
-        elem = Gauss_kernel(&_data[i * _d], &_data[s * _d], _d, _h);
-        for (size_t j = 0; j < Rr.cols(); j++) {
-          Sr(i, j) += elem * Rr(s, j);
+    Sr.zero();
+    const size_t B = 64;
+    DenseM_t Asub(B, B);
+    // disable openmp for now, adding into Sr needs to be done seq
+    //#pragma omp parallel for firstprivate(Asub) schedule(dynamic)
+    for (size_t c=0; c<_n; c+=B) {
+      // loop over blocks of A (above the diagonal only)
+      for (size_t r=0; r<=c; r+=B) {
+        const int Br = std::min(B, _n - r);
+        const int Bc = std::min(B, _n - c);
+        // construct a block of A
+        if (r != c)
+          for (size_t j=0; j<Bc; j++)
+            for (size_t i=0; i<Br; i++)
+              Asub(i, j) = Gauss_kernel(&_data[(r+i) * _d], &_data[(c+j) * _d], _d, _h);
+        else
+          for (size_t j=0; j<Bc; j++)
+            for (size_t i=0; i<=j; i++) {
+              Asub(i, j) = Gauss_kernel(&_data[(r+i) * _d], &_data[(c+j) * _d], _d, _h);
+              Asub(j, i) = Asub(i, j);
+            }
+
+        DenseMW_t Ablock(Br, Bc, Asub, 0, 0);
+        // Rblock is a subblock of Rr of dimension Bc x Rr.cols(),
+        // starting at position c,0 in Rr
+        DenseMW_t Rblock(Bc, Rr.cols(), Rr, c, 0);
+        DenseMW_t Sblock(Br, Sr.cols(), Sr, r, 0);
+        // multiply block of A with a row-block of Rr and add result to Sr
+        gemm(Trans::N, Trans::N, 1., Ablock, Rblock, 1., Sblock);
+        if (r != c) {
+          DenseMW_t Rtblock(Br, Rr.cols(), Rr, r, 0);
+          DenseMW_t Stblock(Bc, Sr.cols(), Sr, c, 0);
+          // multiply transpose of block of A with a row-block of Rr
+          gemm(Trans::T, Trans::N, 1., Ablock, Rtblock, 1., Stblock);
         }
       }
     }
+
+    // DenseM_t K(_n, _n);
+    // for (size_t c=0; c<_n; c++)
+    //   for (size_t r=0; r<_n; r++)
+    //     K(r, c) = Gauss_kernel(&_data[r * _d], &_data[c * _d], _d, _h);
+    // DenseM_t Stest(Sr.rows(), Sr.cols());
+    // gemm(Trans::N, Trans::N, 1., K, Rr, 0., Stest);
+    // Stest.scaled_add(-1., Sr);
+    // std::cout << " ||Sr-Stest|| = " << Stest.norm() << std::endl;
   }
 
   void operator()(DenseM_t &Rr, DenseM_t &Rc, DenseM_t &Sr, DenseM_t &Sc) {
     times(Rr, Sr);
-    times(Rc, Sc);
+    //times(Rc, Sc);
+    Sc.copy(Sr);
   }
 };
 
