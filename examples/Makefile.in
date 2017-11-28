@@ -95,9 +95,9 @@ MLkernel: MLkernel.cpp
 	$(RM) MLkernel.o
 
 MLkernel_matrixfree: MLkernel_matrixfree.cpp
-        $(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o MLkernel_matrixfree.o
-        $(CXX) $(LDFLAGS) MLkernel_matrixfree.o -o $@ $(LIBS)
-        $(RM) MLkernel_matrixfree.o
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o MLkernel_matrixfree.o
+	$(CXX) $(LDFLAGS) MLkernel_matrixfree.o -o $@ $(LIBS)
+	$(RM) MLkernel_matrixfree.o
 
 KernelMatrixCompression: KernelMatrixCompression.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelMatrixCompression.o
