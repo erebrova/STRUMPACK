@@ -1,4 +1,7 @@
-all: sexample dexample cexample zexample testPoisson2d testPoisson3d	\
+all: MLkernel KernelMatrixCompression KernelRegression \
+MLkernel_matrixfree mtx2bin bin2mtx 
+
+all_default: sexample dexample cexample zexample testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble		\
 	testMMdoubleMPI testMMdoubleMPIDist testMMdouble64		\
 	testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist		\

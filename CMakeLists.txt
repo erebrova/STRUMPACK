@@ -255,41 +255,41 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/Makefile.in
 # copy the examples and Makefile to the build directory as well
 configure_file(${CMAKE_SOURCE_DIR}/examples/Makefile
   ${CMAKE_BINARY_DIR}/examples/Makefile COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/pde900.mtx
-  ${CMAKE_BINARY_DIR}/examples/pde900.mtx COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/README
-  ${CMAKE_BINARY_DIR}/examples/README COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/pde900.mtx
+#   ${CMAKE_BINARY_DIR}/examples/pde900.mtx COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/README
+#   ${CMAKE_BINARY_DIR}/examples/README COPYONLY)
 
-configure_file(${CMAKE_SOURCE_DIR}/examples/sexample.c
-  ${CMAKE_BINARY_DIR}/examples/sexample.c COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/dexample.c
-  ${CMAKE_BINARY_DIR}/examples/dexample.c COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/cexample.c
-  ${CMAKE_BINARY_DIR}/examples/cexample.c COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/zexample.c
-  ${CMAKE_BINARY_DIR}/examples/zexample.c COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2d.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson2d.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3d.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson3d.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPI.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPI.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPIDist.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdouble.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPI.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPI.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble64.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdouble64.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist64.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist64.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloat.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMfloat.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloatMPIDist.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMfloatMPIDist.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/sexample.c
+#   ${CMAKE_BINARY_DIR}/examples/sexample.c COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/dexample.c
+#   ${CMAKE_BINARY_DIR}/examples/dexample.c COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/cexample.c
+#   ${CMAKE_BINARY_DIR}/examples/cexample.c COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/zexample.c
+#   ${CMAKE_BINARY_DIR}/examples/zexample.c COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2d.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testPoisson2d.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3d.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testPoisson3d.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPI.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPI.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPIDist.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testMMdouble.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPI.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPI.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble64.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testMMdouble64.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist64.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist64.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloat.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testMMfloat.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloatMPIDist.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testMMfloatMPIDist.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/mtx2bin.cpp
   ${CMAKE_BINARY_DIR}/examples/mtx2bin.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
