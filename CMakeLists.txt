@@ -302,7 +302,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/KernelMatrixCompression.cpp
   ${CMAKE_BINARY_DIR}/examples/KernelMatrixCompression.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression.cpp
   ${CMAKE_BINARY_DIR}/examples/KernelRegression.cpp COPYONLY)
-
+configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression_mf.cpp
+  ${CMAKE_BINARY_DIR}/examples/KernelRegression_mf.cpp COPYONLY)
 
 # include(CTest)
 # add_subdirectory(test)
