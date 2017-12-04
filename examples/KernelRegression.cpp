@@ -376,8 +376,8 @@ int main(int argc, char* argv[]) {
   int kernel = 1;  // Gaussian=1, Laplace=2
   int samples_size=1;
 
-  cout <<  endl << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) lambda"
-          "reorder(0=natural,1=recursive 2-means)"
+  cout <<  endl << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) lambda "
+          "reorder(0=natural,1=recursive 2-means) samples_size"
        << endl;
   if (argc > 1) filename = string(argv[1]);
   if (argc > 2) d = stoi(argv[2]);
