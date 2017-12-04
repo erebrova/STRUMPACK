@@ -352,15 +352,18 @@ void recursive_kd(double* p, int n, int d, int cluster_size,
   delete[] nc;
 }
 
-vector<double> write_from_file(string filename) {
+vector<double> write_from_file(int samples_size, string filename) {
   vector<double> data;
   ifstream f(filename);
   string l;
-  while (getline(f, l)) {
+  int count = 0;
+  while (getline(f, l) && count < samples_size) {
     istringstream sl(l);
     string s;
     while (getline(sl, s, ',')) data.push_back(stod(s));
+    count++;
   }
+  // cout << count << endl;
   return data;
 }
 
@@ -371,8 +374,9 @@ int main(int argc, char* argv[]) {
   double h = 3.;
   double lambda = 1.;
   int kernel = 1;  // Gaussian=1, Laplace=2
+  int samples_size=1;
 
-  cout << "# usage: ./ML_kernel file d h kernel(1=Gauss,2=Laplace) "
+  cout <<  endl << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) lambda"
           "reorder(0=natural,1=recursive 2-means)"
        << endl;
   if (argc > 1) filename = string(argv[1]);
@@ -381,6 +385,7 @@ int main(int argc, char* argv[]) {
   if (argc > 4) kernel = stoi(argv[4]);
   if (argc > 5) reorder = stoi(argv[5]);
   if (argc > 6) lambda = stof(argv[6]);
+  if (argc > 7) samples_size = stof(argv[7]);
   cout << "# data dimension = " << d << endl;
   cout << "# kernel h = " << h << endl;
   cout << "# kernel type = " << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
@@ -389,16 +394,15 @@ int main(int argc, char* argv[]) {
                           : ((reorder == 1) ? "recursive 2-means" : "kd"))
        << endl;
   cout << "# lambda = " << lambda << endl;
+  cout << "# samples_size = " << samples_size << endl;
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
 
-  vector<double> data_train = write_from_file(filename + "_train.csv");
-  vector<double> data_test = write_from_file(filename + "_test.csv");
-  vector<double> data_train_label =
-      write_from_file(filename + "_train_label.csv");
-  vector<double> data_test_label =
-      write_from_file(filename + "_test_label.csv");
+  vector<double> data_train       = write_from_file(samples_size, filename + "_train.csv");
+  vector<double> data_test        = write_from_file(samples_size, filename + "_test.csv");
+  vector<double> data_train_label = write_from_file(samples_size, filename + "_train_label.csv");
+  vector<double> data_test_label  = write_from_file(samples_size, filename + "_test_label.csv");
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
@@ -463,12 +467,19 @@ int main(int argc, char* argv[]) {
        << 100. * K.memory() / Kdense.memory() << "% of dense" << endl;
 
   // solve test
+
+  timer.start();
   auto ULV = K.factor();
+  cout << "# factor time = " << timer.elapsed() << endl;
 
   DenseMatrix<double> B(n, 1, &data_train_label[0], n);
   DenseMatrix<double> weights(B);
 
+  timer.start();
   K.solve(ULV, weights);
+  cout << "# solve time = " << timer.elapsed() << endl;
+
+  
   auto Bcheck = K.apply(weights);
 
   Bcheck.scaled_add(-1., B);
