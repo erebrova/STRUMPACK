@@ -112,6 +112,10 @@ KernelRegression: KernelRegression.cpp
 	$(CXX) $(LDFLAGS) KernelRegression.o -o $@ $(LIBS)
 	$(RM) KernelRegression.o
 
+KernelRegression_mf: KernelRegression_mf.cpp
+        $(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelRegression_mf.o
+        $(CXX) $(LDFLAGS) KernelRegression_mf.o -o $@ $(LIBS)
+        $(RM) KernelRegression_mf.o
 clean:
 	rm -f *~ *o sexample dexample cexample zexample testPoisson2d	\
 		testPoisson3d testPoisson2dMPI testPoisson2dMPIDist	\
