@@ -390,9 +390,10 @@ int main(int argc, char *argv[]) {
   double h = 3.;
   double lambda = 1.;
   int kernel = 1; // Gaussian=1, Laplace=2
+  double total_time;
 
-  cout << "# usage: ./ML_kernel file d h kernel(1=Gauss,2=Laplace) "
-          "reorder(0=natural,1=recursive 2-means)"
+  cout << "# usage: ./KernelRegression_mf file d h kernel(1=Gauss,2=Laplace) "
+          "reorder(0=natural,1=recursive 2-means) lambda"
        << endl;
   if (argc > 1)
     filename = string(argv[1]);
@@ -475,6 +476,7 @@ int main(int argc, char *argv[]) {
   timer.start();
   K.compress(Kdense, hss_opts);
   cout << "# compression time = " << timer.elapsed() << endl;
+  total_time += timer.elapsed();
 
   if (K.is_compressed()) {
     cout << "# created K matrix of dimension " << K.rows() << " x " << K.cols()
@@ -489,12 +491,19 @@ int main(int argc, char *argv[]) {
        << 100. * K.memory() / Kdense.memory() << "% of dense" << endl;
 
   // solve test
+  timer.start();
   auto ULV = K.factor();
+  cout << "# factor time = " << timer.elapsed() << endl;
+  total_time += timer.elapsed();
 
   DenseMatrix<double> B(n, 1, &data_train_label[0], n);
   DenseMatrix<double> weights(B);
 
+  timer.start();
   K.solve(ULV, weights);
+  cout << "# solve time = " << timer.elapsed() << endl;
+  total_time += timer.elapsed();
+
   auto Bcheck = K.apply(weights);
 
   Bcheck.scaled_add(-1., B);
@@ -531,6 +540,8 @@ int main(int argc, char *argv[]) {
   }
   cout << "prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
        << endl;
+
+  cout << "total_time: " << total_time << endl << endl;
 
   return 0;
 }
