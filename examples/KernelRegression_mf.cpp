@@ -619,9 +619,10 @@ int main(int argc, char *argv[]) {
   double h = 3.;
   double lambda = 1.;
   int kernel = 1; // Gaussian=1, Laplace=2
+  double total_time;
 
-  cout << "# usage: ./ML_kernel file d h kernel(1=Gauss,2=Laplace) "
-          "reorder(natural, 2means, kd or pca)"
+  cout << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) "
+          "reorder(natural, 2means, kd, pca) lambda"
        << endl;
   if (argc > 1)
     filename = string(argv[1]);
@@ -686,6 +687,7 @@ int main(int argc, char *argv[]) {
   Kernel kernel_matrix(data_train, d, h, lambda);
   K.compress(kernel_matrix, kernel_matrix, hss_opts);
   cout << "# compression time = " << timer.elapsed() << endl;
+  total_time += timer.elapsed();
 
   if (K.is_compressed()) {
     cout << "# created K matrix of dimension " << K.rows() << " x " << K.cols()
@@ -696,17 +698,22 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   cout << "# rank(K) = " << K.rank() << endl;
-  cout << "# memory(K) = " << K.memory() / 1e6 << " MB, " << endl;
+  cout << "# memory(K) = " << K.memory() / 1e6 << " MB " << endl;
 
   cout << "factorization start" << endl;
+  timer.start();
   auto ULV = K.factor();
-  cout << "factorized" << endl;
+  cout << "done, factoriztion time = " << timer.elapsed() << endl;
+  total_time += timer.elapsed();
 
   DenseMatrix<double> B(n, 1, &data_train_label[0], n);
   DenseMatrix<double> weights(B);
+
   cout << "solution start" << endl;
+  timer.start();
   K.solve(ULV, weights);
-  cout << "solved" << endl;
+  cout << "done, solution time = " << timer.elapsed() << endl;
+  total_time += timer.elapsed();
 
   auto Bcheck = K.apply(weights);
 
@@ -742,10 +749,10 @@ int main(int argc, char *argv[]) {
     double a = (prediction[i] - data_test_label[i]) / 2;
     incorrect_quant += (a > 0 ? a : -a);
   }
-  cout << "prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
+  cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
        << endl;
 
-  cout << "total_time: " << total_time << endl << endl;
+  cout << "# total time: " << total_time << endl;
 
   return 0;
 }
