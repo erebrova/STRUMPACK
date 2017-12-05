@@ -24,6 +24,8 @@
  * Division).
  *
  */
+#include "HSS/HSSMatrix.hpp"
+#include "TaskTimer.hpp"
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -31,8 +33,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "HSS/HSSMatrix.hpp"
-#include "TaskTimer.hpp"
 
 using namespace std;
 using namespace strumpack;
@@ -45,31 +45,33 @@ random_device rd;
 double r;
 mt19937 generator(rd());
 
-inline double dist2(double* x, double* y, int d) {
+inline double dist2(double *x, double *y, int d) {
   double k = 0.;
-  for (int i = 0; i < d; i++) k += pow(x[i] - y[i], 2.);
+  for (int i = 0; i < d; i++)
+    k += pow(x[i] - y[i], 2.);
   return k;
 }
 
-inline double dist(double* x, double* y, int d) { return sqrt(dist2(x, y, d)); }
+inline double dist(double *x, double *y, int d) { return sqrt(dist2(x, y, d)); }
 
-inline double norm1(double* x, double* y, int d) {
+inline double norm1(double *x, double *y, int d) {
   double k = 0.;
-  for (int i = 0; i < d; i++) k += fabs(x[i] - y[i]);
+  for (int i = 0; i < d; i++)
+    k += fabs(x[i] - y[i]);
   return k;
 }
 
-inline double Gauss_kernel(double* x, double* y, int d, double h) {
+inline double Gauss_kernel(double *x, double *y, int d, double h) {
   return exp(-dist2(x, y, d) / (2. * h * h));
 }
 
-inline double Laplace_kernel(double* x, double* y, int d, double h) {
+inline double Laplace_kernel(double *x, double *y, int d, double h) {
   return exp(-norm1(x, y, d) / h);
 }
 
-inline int* kmeans_start_random(int n, int k) {
+inline int *kmeans_start_random(int n, int k) {
   uniform_int_distribution<int> uniform_random(0, n - 1);
-  int* ind_centers = new int[k];
+  int *ind_centers = new int[k];
   for (int i = 0; i < k; i++) {
     ind_centers[i] = uniform_random(generator);
   }
@@ -78,13 +80,13 @@ inline int* kmeans_start_random(int n, int k) {
 
 // 3 more start sampling methods for the case k == 2
 
-int* kmeans_start_random_dist_maximized(int n, double* p, int d) {
+int *kmeans_start_random_dist_maximized(int n, double *p, int d) {
   constexpr size_t k = 2;
 
   uniform_int_distribution<int> uniform_random(0, n - 1);
   const auto t = uniform_random(generator);
   // compute probabilities
-  double* cur_dist = new double[n];
+  double *cur_dist = new double[n];
   for (int i = 0; i < n; i++) {
     cur_dist[i] = dist2(&p[i * d], &p[t * d], d);
   }
@@ -93,14 +95,14 @@ int* kmeans_start_random_dist_maximized(int n, double* p, int d) {
 
   delete[] cur_dist;
 
-  int* ind_centers = new int[k];
+  int *ind_centers = new int[k];
   ind_centers[0] = t;
   ind_centers[1] = random_center(generator);
   return ind_centers;
 }
 
 // for k = 2 only
-int* kmeans_start_dist_maximized(int n, double* p, int d) {
+int *kmeans_start_dist_maximized(int n, double *p, int d) {
   constexpr size_t k = 2;
 
   // find centroid
@@ -116,7 +118,8 @@ int* kmeans_start_dist_maximized(int n, double* p, int d) {
     }
   }
 
-  for (int j = 0; j < d; j++) centroid[j] /= n;
+  for (int j = 0; j < d; j++)
+    centroid[j] /= n;
 
   // find farthest point from centroid
   int first_index = 0;
@@ -139,48 +142,49 @@ int* kmeans_start_dist_maximized(int n, double* p, int d) {
       second_index = i;
     }
   }
-  int* ind_centers = new int[k];
+  int *ind_centers = new int[k];
   ind_centers[0] = first_index;
   ind_centers[1] = second_index;
   return ind_centers;
 }
 
-inline int* kmeans_start_fixed(int n, double* p, int d) {
-  int* ind_centers = new int[2];
+inline int *kmeans_start_fixed(int n, double *p, int d) {
+  int *ind_centers = new int[2];
   ind_centers[0] = 0;
   ind_centers[1] = n - 1;
   return ind_centers;
 }
 
-void k_means(int k, double* p, int n, int d, int* nc, double* labels) {
-  double** center = new double*[k];
+void k_means(int k, double *p, int n, int d, int *nc, double *labels) {
+  double **center = new double *[k];
 
-  int* ind_centers = NULL;
+  int *ind_centers = NULL;
 
   constexpr int kmeans_options = 2;
   switch (kmeans_options) {
-    case 1:
-      ind_centers = kmeans_start_random(n, k);
-      break;
-    case 2:
-      ind_centers = kmeans_start_random_dist_maximized(n, p, d);
-      break;
-    case 3:
-      ind_centers = kmeans_start_dist_maximized(n, p, d);
-      break;
-    case 4:
-      ind_centers = kmeans_start_fixed(n, p, d);
-      break;
+  case 1:
+    ind_centers = kmeans_start_random(n, k);
+    break;
+  case 2:
+    ind_centers = kmeans_start_random_dist_maximized(n, p, d);
+    break;
+  case 3:
+    ind_centers = kmeans_start_dist_maximized(n, p, d);
+    break;
+  case 4:
+    ind_centers = kmeans_start_fixed(n, p, d);
+    break;
   }
 
   for (int c = 0; c < k; c++) {
     center[c] = new double[d];
-    for (int j = 0; j < d; j++) center[c][j] = p[ind_centers[c] * d + j];
+    for (int j = 0; j < d; j++)
+      center[c][j] = p[ind_centers[c] * d + j];
   }
 
   int iter = 0;
   bool changes = true;
-  int* cluster = new int[n];
+  int *cluster = new int[n];
   for (int i = 0; i < n; i++) {
     cluster[i] = 0;
   }
@@ -205,27 +209,33 @@ void k_means(int k, double* p, int n, int d, int* nc, double* labels) {
 
     for (int c = 0; c < k; c++) {
       nc[c] = 0;
-      for (int j = 0; j < d; j++) center[c][j] = 0.;
+      for (int j = 0; j < d; j++)
+        center[c][j] = 0.;
     }
     for (int i = 0; i < n; i++) {
       auto c = cluster[i];
       nc[c]++;
-      for (int j = 0; j < d; j++) center[c][j] += p[i * d + j];
+      for (int j = 0; j < d; j++)
+        center[c][j] += p[i * d + j];
     }
     for (int c = 0; c < k; c++)
-      for (int j = 0; j < d; j++) center[c][j] /= nc[c];
+      for (int j = 0; j < d; j++)
+        center[c][j] /= nc[c];
     iter++;
   }
 
-  int* ci = new int[k];
-  for (int c = 0; c < k; c++) ci[c] = 0;
-  double* p_perm = new double[n * d];
-  double* labels_perm = new double[n];
+  int *ci = new int[k];
+  for (int c = 0; c < k; c++)
+    ci[c] = 0;
+  double *p_perm = new double[n * d];
+  double *labels_perm = new double[n];
   int row = 0;
   for (int c = 0; c < k; c++) {
     for (int j = 0; j < nc[c]; j++) {
-      while (cluster[ci[c]] != c) ci[c]++;
-      for (int l = 0; l < d; l++) p_perm[l + row * d] = p[l + ci[c] * d];
+      while (cluster[ci[c]] != c)
+        ci[c]++;
+      for (int l = 0; l < d; l++)
+        p_perm[l + row * d] = p[l + ci[c] * d];
       labels_perm[row] = labels[ci[c]];
       ci[c]++;
       row++;
@@ -237,18 +247,21 @@ void k_means(int k, double* p, int n, int d, int* nc, double* labels) {
   delete[] labels_perm;
   delete[] ci;
 
-  for (int i = 0; i < k; i++) delete[] center[i];
+  for (int i = 0; i < k; i++)
+    delete[] center[i];
   delete[] center;
   delete[] cluster;
   delete[] ind_centers;
 }
 
-void recursive_2_means(double* p, int n, int d, int cluster_size,
-                       HSSPartitionTree& tree, double* labels) {
-  if (n < cluster_size) return;
+void recursive_2_means(double *p, int n, int d, int cluster_size,
+                       HSSPartitionTree &tree, double *labels) {
+  if (n < cluster_size)
+    return;
   auto nc = new int[2];
   k_means(2, p, n, d, nc, labels);
-  if (nc[0] == 0 || nc[1] == 0) return;
+  if (nc[0] == 0 || nc[1] == 0)
+    return;
   tree.c.resize(2);
   tree.c[0].size = nc[0];
   tree.c[1].size = nc[1];
@@ -258,10 +271,10 @@ void recursive_2_means(double* p, int n, int d, int cluster_size,
   delete[] nc;
 }
 
-void kd_partition(double* p, int n, int d, int* nc, double* labels) {
+void kd_partition(double *p, int n, int d, int *nc, double *labels) {
   // find coordinate of the most spread
-  double* maxes = new double[d];
-  double* mins = new double[d];
+  double *maxes = new double[d];
+  double *mins = new double[d];
 
   for (int j = 0; j < d; ++j) {
     maxes[j] = p[j];
@@ -295,7 +308,7 @@ void kd_partition(double* p, int n, int d, int* nc, double* labels) {
   mean_value /= n;
 
   // split the data
-  int* cluster = new int[n];
+  int *cluster = new int[n];
   for (int i = 0; i < n; i++) {
     cluster[i] = 0;
   }
@@ -312,15 +325,18 @@ void kd_partition(double* p, int n, int d, int* nc, double* labels) {
 
   // permute the data
 
-  int* ci = new int[2];
-  for (int c = 0; c < 2; c++) ci[c] = 0;
-  double* p_perm = new double[n * d];
-  double* labels_perm = new double[n];
+  int *ci = new int[2];
+  for (int c = 0; c < 2; c++)
+    ci[c] = 0;
+  double *p_perm = new double[n * d];
+  double *labels_perm = new double[n];
   int row = 0;
   for (int c = 0; c < 2; c++) {
     for (int j = 0; j < nc[c]; j++) {
-      while (cluster[ci[c]] != c) ci[c]++;
-      for (int l = 0; l < d; l++) p_perm[l + row * d] = p[l + ci[c] * d];
+      while (cluster[ci[c]] != c)
+        ci[c]++;
+      for (int l = 0; l < d; l++)
+        p_perm[l + row * d] = p[l + ci[c] * d];
       labels_perm[row] = labels[ci[c]];
       ci[c]++;
       row++;
@@ -337,12 +353,14 @@ void kd_partition(double* p, int n, int d, int* nc, double* labels) {
   delete[] cluster;
 }
 
-void recursive_kd(double* p, int n, int d, int cluster_size,
-                  HSSPartitionTree& tree, double* labels) {
-  if (n < cluster_size) return;
+void recursive_kd(double *p, int n, int d, int cluster_size,
+                  HSSPartitionTree &tree, double *labels) {
+  if (n < cluster_size)
+    return;
   auto nc = new int[2];
   kd_partition(p, n, d, nc, labels);
-  if (nc[0] == 0 || nc[1] == 0) return;
+  if (nc[0] == 0 || nc[1] == 0)
+    return;
   tree.c.resize(2);
   tree.c[0].size = nc[0];
   tree.c[1].size = nc[1];
@@ -355,6 +373,7 @@ void recursive_kd(double* p, int n, int d, int cluster_size,
 class Kernel {
   using DenseM_t = DenseMatrix<double>;
   using DenseMW_t = DenseMatrixWrapper<double>;
+
 public:
   vector<double> _data;
   int _d = 0;
@@ -362,75 +381,75 @@ public:
   double _h = 0.;
   double _l = 0.;
   Kernel() = default;
-  Kernel(vector<double> data, int d, double h, double l):
-    _data(std::move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
+  Kernel(vector<double> data, int d, double h, double l)
+      : _data(std::move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
     assert(_n * _d == _data.size());
   }
-  void operator()(const vector<size_t>& I,
-                  const vector<size_t>& J, DenseM_t& B) {
+  void operator()(const vector<size_t> &I, const vector<size_t> &J,
+                  DenseM_t &B) {
     assert(I.size() == B.rows() && J.size() == B.cols());
-    for (size_t j=0; j<J.size(); j++) {
-      for (size_t i=0; i<I.size(); i++) {
-        B(i,j) = Gauss_kernel(&_data[I[i] * _d], &_data[J[j] * _d], _d, _h);
-        if (I[i] == J[j]){
-          B(i,j) += _l;
+    for (size_t j = 0; j < J.size(); j++) {
+      for (size_t i = 0; i < I.size(); i++) {
+        B(i, j) = Gauss_kernel(&_data[I[i] * _d], &_data[J[j] * _d], _d, _h);
+        if (I[i] == J[j]) {
+          B(i, j) += _l;
         }
       }
     }
   }
 
-  void times(DenseM_t& Rr, DenseM_t& Sr) {
-    assert(Rr.rows() ==_n);
+  void times(DenseM_t &Rr, DenseM_t &Sr) {
+    assert(Rr.rows() == _n);
     Sr.zero();
     const size_t B = 64;
     DenseM_t Asub(B, B);
-    // disable openmp for now, adding into Sr needs to be done seq             
-    //#pragma omp parallel for firstprivate(Asub) schedule(dynamic)            
-    for (size_t c=0; c<_n; c+=B) {
-      // loop over blocks of A (above the diagonal only)                       
-      for (size_t r=0; r<=c; r+=B) {
+    // disable openmp for now, adding into Sr needs to be done seq
+    //#pragma omp parallel for firstprivate(Asub) schedule(dynamic)
+    for (size_t c = 0; c < _n; c += B) {
+      // loop over blocks of A (above the diagonal only)
+      for (size_t r = 0; r <= c; r += B) {
         const int Br = std::min(B, _n - r);
         const int Bc = std::min(B, _n - c);
-        // construct a block of A                                              
+        // construct a block of A
         if (r != c)
-          for (size_t j=0; j<Bc; j++)
-            for (size_t i=0; i<Br; i++) {
-              Asub(i, j) = Gauss_kernel(&_data[(r+i) * _d], &_data[(c+j) * _d],					_d, _h);
+          for (size_t j = 0; j < Bc; j++)
+            for (size_t i = 0; i < Br; i++) {
+              Asub(i, j) = Gauss_kernel(&_data[(r + i) * _d],
+                                        &_data[(c + j) * _d], _d, _h);
             }
-	else
-	  for (size_t j=0; j<Bc; j++)
-	    for (size_t i=0; i<=j; i++) {
-	      Asub(i, j) = Gauss_kernel(&_data[(r+i) * _d], &_data[(c+j) * _d]\
-					, _d, _h);
-	      if (i == j) {
-		Asub(i, j) += _l;
-	      }
-	      Asub(j, i) = Asub(i, j);
-	    }
+        else
+          for (size_t j = 0; j < Bc; j++)
+            for (size_t i = 0; i <= j; i++) {
+              Asub(i, j) = Gauss_kernel(&_data[(r + i) * _d],
+                                        &_data[(c + j) * _d], _d, _h);
+              if (i == j) {
+                Asub(i, j) += _l;
+              }
+              Asub(j, i) = Asub(i, j);
+            }
 
-	DenseMW_t Ablock(Br, Bc, Asub, 0, 0);
-        // Rblock is a subblock of Rr of dimension Bc x Rr.cols(),             
-        // starting at position c,0 in Rr                                      
+        DenseMW_t Ablock(Br, Bc, Asub, 0, 0);
+        // Rblock is a subblock of Rr of dimension Bc x Rr.cols(),
+        // starting at position c,0 in Rr
         DenseMW_t Rblock(Bc, Rr.cols(), Rr, c, 0);
         DenseMW_t Sblock(Br, Sr.cols(), Sr, r, 0);
-	// multiply block of A with a row-block of Rr and add result to Sr     
+        // multiply block of A with a row-block of Rr and add result to Sr
         gemm(Trans::N, Trans::N, 1., Ablock, Rblock, 1., Sblock);
         if (r != c) {
           DenseMW_t Rtblock(Br, Rr.cols(), Rr, r, 0);
           DenseMW_t Stblock(Bc, Sr.cols(), Sr, c, 0);
-          // multiply transpose of block of A with a row-block of R            
+          // multiply transpose of block of A with a row-block of R
           gemm(Trans::T, Trans::N, 1., Ablock, Rtblock, 1., Stblock);
         }
       }
     }
   }
 
-  void operator()(DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
+  void operator()(DenseM_t &Rr, DenseM_t &Rc, DenseM_t &Sr, DenseM_t &Sc) {
     times(Rr, Sr);
     Sc.copy(Sr);
   }
 };
-
 
 vector<double> write_from_file(string filename) {
   vector<double> data;
@@ -439,36 +458,41 @@ vector<double> write_from_file(string filename) {
   while (getline(f, l)) {
     istringstream sl(l);
     string s;
-    while (getline(sl, s, ',')) data.push_back(stod(s));
+    while (getline(sl, s, ','))
+      data.push_back(stod(s));
   }
   return data;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   string filename("smalltest.dat");
   int d = 2;
-  int reorder = 0;
+  string reorder("natural");
   double h = 3.;
   double lambda = 1.;
-  int kernel = 1;  // Gaussian=1, Laplace=2
+  int kernel = 1; // Gaussian=1, Laplace=2
 
-  cout << "# usage: ./KernelRegression_mf file d h kernel(1=Gauss,2=Laplace) "
-          "reorder(0=natural,1=recursive 2-means) lambda"
+  cout << "# usage: ./ML_kernel file d h kernel(1=Gauss,2=Laplace) "
+          "reorder(natural, 2means or kd)"
        << endl;
-  if (argc > 1) filename = string(argv[1]);
-  if (argc > 2) d = stoi(argv[2]);
-  if (argc > 3) h = stof(argv[3]);
-  if (argc > 4) kernel = stoi(argv[4]);
-  if (argc > 5) reorder = stoi(argv[5]);
-  if (argc > 6) lambda = stof(argv[6]);
+  if (argc > 1)
+    filename = string(argv[1]);
+  if (argc > 2)
+    d = stoi(argv[2]);
+  if (argc > 3)
+    h = stof(argv[3]);
+  if (argc > 4)
+    kernel = stoi(argv[4]);
+  if (argc > 5)
+    reorder = string(argv[5]);
+  if (argc > 6)
+    lambda = stof(argv[6]);
   cout << "# data dimension = " << d << endl;
   cout << "# kernel h = " << h << endl;
-  cout << "# kernel type = " << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
-  cout << "# reordering/clustering = "
-       << ((reorder == 0) ? "natural"
-                          : ((reorder == 1) ? "recursive 2-means" : "kd"))
-       << endl;
   cout << "# lambda = " << lambda << endl;
+  cout << "# kernel type = " << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
+  cout << "# reordering/clustering = " << reorder << endl;
+
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
@@ -487,20 +511,21 @@ int main(int argc, char* argv[]) {
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
-  if (reorder == 1) {
-    cout << " 2 means" << endl;
+
+  if (reorder == "2means") {
+    cout << "2 means" << endl;
     recursive_2_means(data_train.data(), n, d, cluster_size, cluster_tree,
                       data_train_label.data());
-  } else if (reorder == 2) {
+  } else if (reorder == "kd") {
+    cout << "kd tree" << endl;
     recursive_kd(data_train.data(), n, d, cluster_size, cluster_tree,
                  data_train_label.data());
-    cout << "kd " << endl;
   }
- 
+
   cout << "starting HSS compression .. " << endl;
 
   HSSMatrix<double> K;
-  if (reorder != 0)
+  if (reorder != "natural")
     K = HSSMatrix<double>(cluster_tree, hss_opts);
   else
     K = HSSMatrix<double>(n, n, hss_opts);
@@ -510,8 +535,8 @@ int main(int argc, char* argv[]) {
   timer.start();
   //  K.compress(Kdense, hss_opts);
   Kernel kernel_matrix(data_train, d, h, lambda);
-  K.compress(kernel_matrix, kernel_matrix, hss_opts); 
- cout << "# compression time = " << timer.elapsed() << endl;
+  K.compress(kernel_matrix, kernel_matrix, hss_opts);
+  cout << "# compression time = " << timer.elapsed() << endl;
 
   if (K.is_compressed()) {
     cout << "# created K matrix of dimension " << K.rows() << " x " << K.cols()
@@ -523,7 +548,7 @@ int main(int argc, char* argv[]) {
   }
   cout << "# rank(K) = " << K.rank() << endl;
   cout << "# memory(K) = " << K.memory() / 1e6 << " MB, " << endl;
-    
+
   cout << "factorization start" << endl;
   auto ULV = K.factor();
   cout << "factorized" << endl;
@@ -540,7 +565,7 @@ int main(int argc, char* argv[]) {
   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
        << Bcheck.normF() / B.normF() << endl;
 
-  double* prediction = new double[m];
+  double *prediction = new double[m];
   for (int i = 0; i < m; ++i) {
     prediction[i] = 0;
   }
