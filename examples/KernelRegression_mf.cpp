@@ -677,8 +677,9 @@ int main(int argc, char *argv[]) {
   HSSMatrix<double> K;
   if (reorder != "natural")
     K = HSSMatrix<double>(cluster_tree, hss_opts);
-  else
+  else{
     K = HSSMatrix<double>(n, n, hss_opts);
+  }
 
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
@@ -703,7 +704,7 @@ int main(int argc, char *argv[]) {
   cout << "factorization start" << endl;
   timer.start();
   auto ULV = K.factor();
-  cout << "done, factoriztion time = " << timer.elapsed() << endl;
+  cout << "# factorization time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
 
   DenseMatrix<double> B(n, 1, &data_train_label[0], n);
@@ -712,8 +713,9 @@ int main(int argc, char *argv[]) {
   cout << "solution start" << endl;
   timer.start();
   K.solve(ULV, weights);
-  cout << "done, solution time = " << timer.elapsed() << endl;
+  cout << "# solve time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
+  cout << "# total time: " << total_time << endl;
 
   auto Bcheck = K.apply(weights);
 
@@ -750,9 +752,7 @@ int main(int argc, char *argv[]) {
     incorrect_quant += (a > 0 ? a : -a);
   }
   cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
-       << endl;
-
-  cout << "# total time: " << total_time << endl;
+       << endl << endl;;
 
   return 0;
 }
