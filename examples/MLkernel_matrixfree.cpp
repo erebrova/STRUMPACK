@@ -397,28 +397,20 @@ public:
     Sr.zero();
     const size_t B = 64;
     DenseM_t Asub(B, B);
-    // disable openmp for now, adding into Sr needs to be done seq
-    //#pragma omp parallel for firstprivate(Asub) schedule(dynamic)
-    for (size_t c=0; c<_n; c+=B) {
-      // loop over blocks of A (above the diagonal only)
-      for (size_t r=0; r<=c; r+=B) {
+#pragma omp parallel for firstprivate(Asub) schedule(dynamic)
+    for (size_t c = 0; c < _n; c += B) {
+      // loop over blocks of A
+      for (size_t r = 0; r < _n; r += B) {
         const int Br = std::min(B, _n - r);
         const int Bc = std::min(B, _n - c);
         // construct a block of A
-        if (r != c)
-          for (size_t j=0; j<Bc; j++)
-            for (size_t i=0; i<Br; i++)
-              Asub(i, j) = Gauss_kernel(&_data[(r+i) * _d], &_data[(c+j) * _d], _d, _h);
-        else
-          for (size_t j=0; j<Bc; j++)
-            for (size_t i=0; i<=j; i++) {
-              Asub(i, j) = Gauss_kernel(&_data[(r+i) * _d], &_data[(c+j) * _d], _d, _h);
-              if (i == j) {
-		Asub(i, j) += _l;
-	      }
-              Asub(j, i) = Asub(i, j);
-            }
-
+        for (size_t j = 0; j < Bc; j++) {
+          for (size_t i = 0; i < Br; i++) {
+            Asub(i, j) = Gauss_kernel
+              (&_data[(r + i) * _d], &_data[(c + j) * _d], _d, _h);
+          }
+          if (r==c) Asub(j, j) += _l;
+        }
         DenseMW_t Ablock(Br, Bc, Asub, 0, 0);
         // Rblock is a subblock of Rr of dimension Bc x Rr.cols(),
         // starting at position c,0 in Rr
@@ -426,12 +418,6 @@ public:
         DenseMW_t Sblock(Br, Sr.cols(), Sr, r, 0);
         // multiply block of A with a row-block of Rr and add result to Sr
         gemm(Trans::N, Trans::N, 1., Ablock, Rblock, 1., Sblock);
-        if (r != c) {
-          DenseMW_t Rtblock(Br, Rr.cols(), Rr, r, 0);
-          DenseMW_t Stblock(Bc, Sr.cols(), Sr, c, 0);
-          // multiply transpose of block of A with a row-block of Rr
-          gemm(Trans::T, Trans::N, 1., Ablock, Rtblock, 1., Stblock);
-        }
       }
     }
 
