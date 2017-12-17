@@ -1,5 +1,6 @@
 all: MLkernel MLkernel_matrixfree KernelRegression KernelRegression_mf	\
-KernelMatrixCompression mtx2bin bin2mtx 
+KernelMatrixCompression mtx2bin bin2mtx	\
+KernelRegressionMPI
 
 all_default: sexample dexample cexample zexample testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble		\
@@ -116,6 +117,11 @@ KernelRegression_mf: KernelRegression_mf.cpp
 		$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelRegression_mf.o
 		$(CXX) $(LDFLAGS) KernelRegression_mf.o -o $@ $(LIBS)
 		$(RM) KernelRegression_mf.o
+
+KernelRegressionMPI: KernelRegressionMPI.cpp
+		$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelRegressionMPI.o
+		$(CXX) $(LDFLAGS) KernelRegressionMPI.o -o $@ $(LIBS)
+		$(RM) KernelRegressionMPI.o
 
 clean:
 	rm -f *~ *o sexample dexample cexample zexample testPoisson2d	\
