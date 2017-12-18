@@ -52,7 +52,7 @@ FortranCInterface_VERIFY(CXX)
 
 option(USE_OPENMP "Use OpenMP for on-node threading tasking" ON)
 option(ENABLE_DEV_TESTING "Enable extensive testing" OFF)
-option(ENABLE_C_INTERFACE "Build the C interface" ON)
+option(ENABLE_C_INTERFACE "Build the C interface" OFF)
 
 if(USE_OPENMP)
   include(FindOpenMP)
@@ -391,6 +391,6 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression_mf.cpp
 configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegressionMPI.cpp
   ${CMAKE_BINARY_DIR}/examples/KernelRegressionMPI.cpp COPYONLY)
 
-include(CTest)
-add_subdirectory(test)
+# include(CTest)
+# add_subdirectory(test)
 
