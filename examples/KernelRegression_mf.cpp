@@ -552,9 +552,9 @@ public:
     const size_t B = 64;
     DenseM_t Asub(B, B);
 #pragma omp parallel for firstprivate(Asub) schedule(dynamic)
-    for (size_t c = 0; c < _n; c += B) {
+    for (size_t r = 0; r < _n; r += B) {
       // loop over blocks of A
-      for (size_t r = 0; r < _n; r += B) {
+      for (size_t c = 0; c < _n; c += B) {
         const int Br = std::min(B, _n - r);
         const int Bc = std::min(B, _n - c);
         // construct a block of A
