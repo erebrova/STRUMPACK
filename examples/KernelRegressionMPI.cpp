@@ -541,6 +541,7 @@ public:
   }
   void operator()(const vector<size_t> &I, const vector<size_t> &J,
                   DistM_t &B) {
+    if (!B.active()) return;
     assert(I.size() == B.rows() && J.size() == B.cols());
     for (size_t j = 0; j < J.size(); j++) {
       if (B.colg2p(j) != B.pcol()) continue;
@@ -571,6 +572,7 @@ public:
             Asub(i, j) = Gauss_kernel
               (&_data[(Ar + i) * _d], &_data[(Ac + j) * _d], _d, _h);
           }
+          if (Ar==Ac) Asub(j,j) += _l;
         }
         DenseMW_t Ablock(Br, Bk, Asub, 0, 0);
         DenseMW_t Sblock(Br, Bc, &S(lr, 0), S.ld());
@@ -741,64 +743,70 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  if (!mpi_rank())
+    cout << "factorization start" << endl;
+  timer.start();
+  auto ULV = K->factor();
+  if (!mpi_rank())
+    cout << "# factorization time = " << timer.elapsed() << endl;
+  total_time += timer.elapsed();
 
+  DenseMatrix<double> B(n, 1, &data_train_label[0], n);
+  DenseMatrix<double> weights(B);
+  DistributedMatrix<double> Bdist(ctxt, B);
+  DistributedMatrix<double> wdist(ctxt, weights);
 
+  if (!mpi_rank())
+    cout << "solution start" << endl;
+  timer.start();
+  K->solve(ULV, wdist);
+  if (!mpi_rank())
+    cout << "# solve time = " << timer.elapsed() << endl;
+  total_time += timer.elapsed();
+  if (!mpi_rank())
+    cout << "# total time: " << total_time << endl;
 
-  // if (!mpi_rank())
-  //   cout << "factorization start" << endl;
-  // timer.start();
-  // auto ULV = K.factor();
-  // if (!mpi_rank())
-  //   cout << "# factorization time = " << timer.elapsed() << endl;
-  // total_time += timer.elapsed();
+  auto Bcheck = K->apply(wdist);
 
-  // DenseMatrix<double> B(n, 1, &data_train_label[0], n);
-  // DenseMatrix<double> weights(B);
+  Bcheck.scaled_add(-1., Bdist);
+  auto Bchecknorm = Bcheck.normF() / Bdist.normF();
+  if (!mpi_rank())
+    cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
+         << Bchecknorm << endl;
 
-  // cout << "solution start" << endl;
-  // timer.start();
-  // K.solve(ULV, weights);
-  // cout << "# solve time = " << timer.elapsed() << endl;
-  // total_time += timer.elapsed();
-  // cout << "# total time: " << total_time << endl;
+  double* prediction = new double[m];
+  std::fill(prediction, prediction+m, 0.);
 
-  // auto Bcheck = K.apply(weights);
+  if (kernel == 1) {
+    for (int c = 0; c < m; c++) {
+      for (int r = 0; r < n; r++) {
+        prediction[c] +=
+          Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+          weights(r, 0);
+      }
+    }
+  } else {
+    for (int c = 0; c < m; c++) {
+      for (int r = 0; r < n; r++) {
+        prediction[c] +=
+          Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+          wdist(r, 0);
+      }
+    }
+  }
 
-  // Bcheck.scaled_add(-1., B);
-  // cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
-  //      << Bcheck.normF() / B.normF() << endl;
+  for (int i = 0; i < m; ++i)
+    prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
 
-  // double *prediction = new double[m];
-  // for (int i = 0; i < m; ++i) {
-  //   prediction[i] = 0;
-  // }
-
-  // if (kernel == 1) {
-  //   for (int c = 0; c < m; c++)
-  //     for (int r = 0; r < n; r++)
-  //       prediction[c] +=
-  //           Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-  //           weights(r, 0);
-  // } else {
-  //   for (int c = 0; c < m; c++)
-  //     for (int r = 0; r < n; r++)
-  //       prediction[c] +=
-  //           Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-  //           weights(r, 0);
-  // }
-
-  // for (int i = 0; i < m; ++i) {
-  //   prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
-  // }
-  // // compute accuracy score of prediction
-  // double incorrect_quant = 0;
-  // for (int i = 0; i < m; ++i) {
-  //   double a = (prediction[i] - data_test_label[i]) / 2;
-  //   incorrect_quant += (a > 0 ? a : -a);
-  // }
-  // cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
-  //      << endl << endl;;
-
+  // compute accuracy score of prediction
+  double incorrect_quant = 0;
+  for (int i = 0; i < m; ++i) {
+    double a = (prediction[i] - data_test_label[i]) / 2;
+    incorrect_quant += (a > 0 ? a : -a);
+  }
+  if (!mpi_rank())
+    cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
+         << endl << endl;
 
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
