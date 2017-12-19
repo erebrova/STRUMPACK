@@ -97,7 +97,8 @@ inline int dyevx(char JOBZ, char RANGE, char UPLO, int N, double *A, int LDA,
 const int kmeans_max_it = 100;
 random_device rd;
 double r;
-mt19937 generator(rd());
+//mt19937 generator(rd());
+mt19937 generator; // make sure to use the same ordering on all processes
 
 inline double dist2(double *x, double *y, int d) {
   double k = 0.;
