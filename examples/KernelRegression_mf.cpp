@@ -322,7 +322,8 @@ void recursive_2_means(double *p, int n, int d, int cluster_size,
   delete[] nc;
 }
 
-void kd_partition(double *p, int n, int d, int *nc, double *labels) {
+void kd_partition(double *p, int n, int d, int *nc, double *labels,
+                  int cluster_size) {
   // find coordinate of the most spread
   double *maxes = new double[d];
   double *mins = new double[d];
@@ -374,6 +375,22 @@ void kd_partition(double *p, int n, int d, int *nc, double *labels) {
     }
   }
 
+  // if clusters are too disbalanced, assign trivial clusters
+
+  if ((nc[0] < cluster_size && nc[1] > 100 * cluster_size) ||
+      (nc[1] < cluster_size && nc[0] > 100 * cluster_size)) {
+    nc[0] = 0;
+    nc[1] = 0;
+    for (int i = 0; i < n; i++) {
+      if (i <= n / 2) {
+        cluster[i] = 0;
+        nc[0] += 1;
+      } else {
+        cluster[i] = 1;
+        nc[1] += 1;
+      }
+    }
+  }
   // permute the data
 
   int *ci = new int[2];
@@ -409,7 +426,7 @@ void recursive_kd(double *p, int n, int d, int cluster_size,
   if (n < cluster_size)
     return;
   auto nc = new int[2];
-  kd_partition(p, n, d, nc, labels);
+  kd_partition(p, n, d, nc, labels, cluster_size);
   if (nc[0] == 0 || nc[1] == 0)
     return;
   tree.c.resize(2);
@@ -603,9 +620,11 @@ int main(int argc, char *argv[]) {
   double lambda = 1.;
   int kernel = 1; // Gaussian=1, Laplace=2
   double total_time;
+  string mode("valid");
 
-  cout << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) "
-          "reorder(natural, 2means, kd, pca) lambda"
+  cout << "# usage: ./KernelRegression file d h lambda "
+          "kernel(1=Gauss,2=Laplace) "
+          "reorder(natural, 2means, kd, pca) mode(valid, test)"
        << endl;
   if (argc > 1)
     filename = string(argv[1]);
@@ -614,27 +633,30 @@ int main(int argc, char *argv[]) {
   if (argc > 3)
     h = stof(argv[3]);
   if (argc > 4)
-    kernel = stoi(argv[4]);
+    lambda = stof(argv[4]);
   if (argc > 5)
-    reorder = string(argv[5]);
+    kernel = stoi(argv[5]);
   if (argc > 6)
-    lambda = stof(argv[6]);
+    reorder = string(argv[6]);
+  if (argc > 7)
+    mode = string(argv[7]);
   cout << "# data dimension = " << d << endl;
   cout << "# kernel h = " << h << endl;
   cout << "# lambda = " << lambda << endl;
   cout << "# kernel type = " << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
   cout << "# reordering/clustering = " << reorder << endl;
+  cout << "# validation/test = " << mode << endl;
 
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
 
   vector<double> data_train = write_from_file(filename + "_train.csv");
-  vector<double> data_test = write_from_file(filename + "_test.csv");
+  vector<double> data_test = write_from_file(filename + "_" + mode + ".csv");
   vector<double> data_train_label =
       write_from_file(filename + "_train_label.csv");
   vector<double> data_test_label =
-      write_from_file(filename + "_test_label.csv");
+      write_from_file(filename + "_" + mode + "_label.csv");
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
