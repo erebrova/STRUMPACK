@@ -90,6 +90,8 @@ namespace strumpack {
     void print(std::string name, bool all=false, int width=8) const;
     void print_to_file
     (std::string name, std::string filename, int width=8) const;
+    void print_to_file_mtx
+    (std::string filename, int width=8) const;
     void random();
     void random
     (random::RandomGeneratorBase<typename RealType<scalar_t>::
@@ -380,6 +382,27 @@ namespace strumpack {
       fs << std::endl;
     }
     fs << "];" << std::endl << std::endl;
+  }
+
+  template<typename scalar_t> void DenseMatrix<scalar_t>::print_to_file_mtx
+    (std::string filename, int width) const {
+    std::fstream fs(filename, std::fstream::out);
+    std::setprecision(16);
+    std::cout << "%%MatrixMarket matrix coordinate real general" << "\n";
+    std::cout << "% GC: Indices start at one" << "\n";
+    std::cout << "% FrobeniusNorm = " << normF() << std::endl;
+    std::cout << _rows << " " << _cols <<  " " << _rows*_cols << "\n";
+    fs << "%%MatrixMarket matrix coordinate real general" << "\n";
+    fs << "% GC: Indices start at one" << "\n";
+    fs << "% FrobeniusNorm=" << normF() << std::endl;
+    fs << _rows << " " << _cols <<  " " << _rows*_cols << "\n";
+
+    for (std::size_t i=0; i<rows(); i++)
+      for (std::size_t j=0; j<cols(); j++){
+        // std::cout << i+1 << " " << j+1 << " " << operator()(i,j) << "\n";
+        fs << i+1 << " " << j+1 << " " << operator()(i,j) << "\n";
+      }
+    fs.close();
   }
 
   template<typename scalar_t> void

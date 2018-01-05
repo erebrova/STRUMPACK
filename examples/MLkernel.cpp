@@ -207,6 +207,12 @@ int main(int argc, char* argv[]) {
         Kdense(r, c) = Laplace_kernel(&data[r*d], &data[c*d], d, h);
   }
 
+  // std::string FILENAME = filename + "_ord" + std::to_string(reorder) + "_h" + std::to_string(h) + ".mtx";
+  // cout << FILENAME << endl;
+  // Kdense.print_to_file_mtx(FILENAME);
+  // cout << "# FrobeniusNorm = " << Kdense.normF() << endl << endl;
+  // return 0;
+
   vector<double>().swap(data); // clear data
 
   cout << "# starting HSS compression .. " << endl;
