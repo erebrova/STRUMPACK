@@ -378,6 +378,10 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/mtx2bin.cpp
   ${CMAKE_BINARY_DIR}/examples/mtx2bin.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
   ${CMAKE_BINARY_DIR}/examples/bin2mtx.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/FileManipulation.h
+  ${CMAKE_BINARY_DIR}/examples/FileManipulation.h COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/FileManipulation.cpp
+  ${CMAKE_BINARY_DIR}/examples/FileManipulation.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
   ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel_matrixfree.cpp

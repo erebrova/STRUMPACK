@@ -34,6 +34,7 @@
 
 #include "HSS/HSSMatrix.hpp"
 #include "misc/TaskTimer.hpp"
+#include "FileManipulation.h"
 
 using namespace std;
 using namespace strumpack;
@@ -656,11 +657,39 @@ int main(int argc, char *argv[]) {
   vector<double> data_train_label =
       write_from_file(filename + "_train_label.csv");
   vector<double> data_test_label =
-      write_from_file(filename + "_" + mode + "_label.csv");
+      write_from_file(filename + "_" + mode + "_label.csv"); 
 
-  int n = data_train.size() / d;
-  int m = data_test.size() / d;
-  cout << "# matrix size = " << n << " x " << d << endl;
+  // size_t training   = 10000;
+  // size_t testing    = 1000;
+  // size_t validation = 0; 
+
+  // vector<double> data_train; 
+  // vector<double> data_test;
+  // vector<double> data_valid;
+
+  // vector<double> data_train_label;
+  // vector<double> data_test_label;
+  // vector<double> data_valid_label;
+
+  // string filename_DATA   = "/Users/gichavez/Desktop/susy10k/susy_10Kn_train.csv";
+  // string filename_LABELS = "/Users/gichavez/Desktop/susy10k/susy_10Kn_train_label.csv";
+
+  // data_read_normalize_from_file(filename_DATA, d, training, validation, testing, data_train, data_valid, data_test);
+  // labels_read_from_file(filename_LABELS, d, training, validation, testing, data_train_label, data_valid_label, data_test_label);
+
+  // cout << "# data_train.size() = " << data_train.size()/d << endl;
+  // cout << "# data_valid.size() = " << data_valid.size()/d << endl;
+  // cout << "# data_test.size() = " << data_test.size()/d << endl;
+
+  // cout << "# data_train_label.size() = " << data_train_label.size() << endl;
+  // cout << "# data_valid_label.size() = " << data_valid_label.size() << endl;
+  // cout << "# data_test_label.size() = " << data_test_label.size() << endl;
+
+  // int n = data_train.size() / d;
+  // int m = data_test.size() / d;
+  // cout << "# matrix size = " << n << " x " << d << endl;
+
+  // exit(0);
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;

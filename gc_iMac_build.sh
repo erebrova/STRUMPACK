@@ -1,7 +1,11 @@
 #!/bin/bash
 
+if [[ $2 == "r" ]];
+then
 rm -rf build
 mkdir build
+fi
+
 cd build
 
 if [[ $1 == "cori" ]];
@@ -49,7 +53,7 @@ cmake .. \
 elif [[ $1 == "imac" ]];
 then
 echo $1
-cmake .. -DCMAKE_BUILD_TYPE=Release \
+cmake .. -DCMAKE_BUILD_TYPE=Debug \
 -DCMAKE_INSTALL_PREFIX=. \
 -DCMAKE_C_COMPILER=mpicc \
 -DCMAKE_CXX_COMPILER=mpic++ \
