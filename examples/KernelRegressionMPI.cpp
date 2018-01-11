@@ -42,6 +42,15 @@ using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
 
+// uncomment this to do the slow, straightforward sampling
+#define FAST_H_SAMPLING 1
+
+#if defined(FAST_H_SAMPLING)
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
+#endif
+
 extern "C" {
 #define SSYEVX_FC FC_GLOBAL(ssyevx, SSYEVX)
 #define DSYEVX_FC FC_GLOBAL(dsyevx, DSYEVX)
@@ -146,7 +155,7 @@ int *kmeans_start_random_dist_maximized(int n, double *p, int d) {
     cur_dist[i] = dist2(&p[i * d], &p[t * d], d);
   }
 
-  std::discrete_distribution<int> random_center(&cur_dist[0], &cur_dist[n]);
+  discrete_distribution<int> random_center(&cur_dist[0], &cur_dist[n]);
 
   delete[] cur_dist;
 
@@ -522,6 +531,15 @@ void recursive_pca(double *p, int n, int d, int cluster_size,
   delete[] nc;
 }
 
+
+extern "C" {
+  void FC_GLOBAL_(h_matrix_fill,H_MATRIX_FILL)
+    (int* Npo, int* Ndim, double* Locations,
+     int* Nmin, double* tol, double* h, double* lam, int* nth);
+  void FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
+    (int* Npo, int* Ncol, double* Xin, double* Xout);
+}
+
 class KernelMPI {
   using DenseM_t = DenseMatrix<double>;
   using DenseMW_t = DenseMatrixWrapper<double>;
@@ -535,14 +553,31 @@ public:
   double _h = 0.;
   double _l = 0.;
   KernelMPI() = default;
-  KernelMPI(vector<double> data, int d, double h, double l)
-    : _data(std::move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
-    assert(_n * _d == _data.size());
+  KernelMPI(vector<double> data, int d, double h, double l,
+            HSSOptions<double>& opts)
+    : _data(move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
+    assert(size_t(_n * _d) == _data.size());
+
+#if defined(FAST_H_SAMPLING)
+    auto starttime = MPI_Wtime();
+    int Nmin = 500;    // finest leafsize
+    //double tol = 1e-2; // compression tolerance
+    double tol = opts.rel_tol(); // compression tolerance
+    int nth = omp_get_max_threads();
+    FC_GLOBAL_(h_matrix_fill,H_MATRIX_FILL)
+      (&_n, &_d, _data.data(), &Nmin, &tol, &h, &l, &nth);
+    auto endtime = MPI_Wtime();
+    if (!mpi_rank())
+      cout << "# H Matrix construction time " << endtime - starttime
+           << " seconds" << endl;
+#endif
   }
+
   void operator()(const vector<size_t> &I, const vector<size_t> &J,
                   DistM_t &B) {
     if (!B.active()) return;
-    assert(I.size() == B.rows() && J.size() == B.cols());
+    assert(I.size() == size_t(B.rows()) &&
+           J.size() == size_t(B.cols()));
     for (size_t j = 0; j < J.size(); j++) {
       if (B.colg2p(j) != B.pcol()) continue;
       for (size_t i = 0; i < I.size(); i++) {
@@ -556,16 +591,37 @@ public:
     }
   }
 
+#if defined(FAST_H_SAMPLING)
+  void operator()(DistM_t &R, DistM_t &Sr, DistM_t &Sc) {
+    auto starttime = MPI_Wtime();
+    int Ncol = R.cols();
+    auto Rseq = R.gather();
+    DenseM_t Srseq(_n, Ncol);
+    DenseM_t Scseq(_n, Ncol);
+    FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
+      (&_n, &Ncol, Srseq.data(), Scseq.data());
+    Sr.scatter(Srseq);
+    Sc.scatter(Scseq);
+    auto endtime = MPI_Wtime();
+    if (!mpi_rank())
+      cout << "# Apply time " << (endtime-starttime)
+           << " seconds, per vector "
+           << ((endtime-starttime)/Ncol)
+           << " seconds" << endl;
+  }
+
+#else
+
   void times(DenseM_t &R, DistM_t &S, int Rprow) {
     const auto B = S.MB();
     const auto Bc = S.lcols();
     DenseM_t Asub(B, B);
 #pragma omp parallel for firstprivate(Asub) schedule(dynamic)
     for (int lr = 0; lr < S.lrows(); lr += B) {
-      const int Br = std::min(B, S.lrows() - lr);
+      const size_t Br = std::min(B, S.lrows() - lr);
       const int Ar = S.rowl2g(lr);
       for (int k = 0, Ac = Rprow*B; Ac < _n; k += B) {
-        const int Bk = std::min(B, _n - Ac);
+        const size_t Bk = std::min(B, _n - Ac);
         // construct a block of A
         for (size_t j = 0; j < Bk; j++) {
           for (size_t i = 0; i < Br; i++) {
@@ -611,6 +667,7 @@ public:
     }
     Sc = Sr;
   }
+#endif
 };
 
 vector<double> write_from_file(string filename) {
@@ -711,7 +768,7 @@ int main(int argc, char *argv[]) {
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
   timer.start();
-  KernelMPI kernel_matrix(data_train, d, h, lambda);
+  KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts);
 
   if (reorder != "natural")
     K = new HSSMatrixMPI<double>
