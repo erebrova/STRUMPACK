@@ -552,17 +552,19 @@ public:
   int _n = 0;
   double _h = 0.;
   double _l = 0.;
+  int _ctxt_all = -1;
   KernelMPI() = default;
   KernelMPI(vector<double> data, int d, double h, double l,
-            HSSOptions<double>& opts)
-    : _data(move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
+            HSSOptions<double>& opts, int ctxt_all)
+    : _data(move(data)), _d(d), _n(_data.size() / _d),
+      _h(h), _l(l), _ctxt_all(ctxt_all) {
     assert(size_t(_n * _d) == _data.size());
 
 #if defined(FAST_H_SAMPLING)
     auto starttime = MPI_Wtime();
     int Nmin = 500;    // finest leafsize
-    //double tol = 1e-2; // compression tolerance
-    double tol = opts.rel_tol(); // compression tolerance
+    double tol = 1e-12; // compression tolerance
+    //double tol = opts.rel_tol(); // compression tolerance
     int nth = omp_get_max_threads();
     FC_GLOBAL_(h_matrix_fill,H_MATRIX_FILL)
       (&_n, &_d, _data.data(), &Nmin, &tol, &h, &l, &nth);
@@ -595,13 +597,13 @@ public:
   void operator()(DistM_t &R, DistM_t &Sr, DistM_t &Sc) {
     auto starttime = MPI_Wtime();
     int Ncol = R.cols();
-    auto Rseq = R.gather();
+    auto Rseq = R.all_gather(_ctxt_all);
+    //auto Rseq = R.gather();
     DenseM_t Srseq(_n, Ncol);
-    DenseM_t Scseq(_n, Ncol);
     FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
-      (&_n, &Ncol, Srseq.data(), Scseq.data());
+      (&_n, &Ncol, Rseq.data(), Srseq.data());
     Sr.scatter(Srseq);
-    Sc.scatter(Scseq);
+    Sc = Sr;
     auto endtime = MPI_Wtime();
     if (!mpi_rank())
       cout << "# Apply time " << (endtime-starttime)
@@ -768,7 +770,7 @@ int main(int argc, char *argv[]) {
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
   timer.start();
-  KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts);
+  KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts, ctxt_all);
 
   if (reorder != "natural")
     K = new HSSMatrixMPI<double>
