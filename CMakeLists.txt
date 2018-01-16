@@ -125,6 +125,8 @@ find_package(ParMetis)
 set(LIBS ${LIBS} ${PARMETIS_LIBRARIES})
 include_directories(${PARMETIS_INCLUDES})
 
+set(LIBS ${LIBS} ${HMATRIX_LIBRARIES})
+
 find_package(Metis)
 set(LIBS ${LIBS} ${METIS_LIBRARIES})
 include_directories(${METIS_INCLUDES})

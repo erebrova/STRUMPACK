@@ -1,4 +1,6 @@
-all: MLkernel MLkernel_matrixfree KernelRegression \
+all: KernelRegressionMPI 
+
+alli: MLkernel MLkernel_matrixfree KernelRegression \
 KernelRegression_mf KernelMatrixCompression mtx2bin bin2mtx \
 KernelRegressionMPI
 

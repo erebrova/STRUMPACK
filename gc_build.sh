@@ -11,7 +11,7 @@ cd build
 if [[ $1 == "cori" ]];
 then
 echo $1
-source ../configEnv.sh
+#source ../configEnv.sh
 export CRAYPE_LINK_TYPE="dynamic"
 export PARMETIS_INSTALL="/global/cscratch1/sd/gichavez/edison/intel17/parmetis-4.0.3"
 export SCOTCH_INSTALL="/global/cscratch1/sd/gichavez/edison/intel17/scotch_6.0.4/build"
@@ -27,6 +27,7 @@ cmake .. \
 -DMETIS_LIBRARIES=$PARMETIS_INSTALL/build/Linux-x86_64/libmetis/libmetis.a \
 -DPARMETIS_INCLUDES=$PARMETIS_INSTALL/install/include \
 -DPARMETIS_LIBRARIES=$PARMETIS_INSTALL/install/lib/libparmetis.a \
+-DHMATRIX_LIBRARIES=/global/cscratch1/sd/gichavez/intel17/h_matrix_rbf_randomization/build/SRC/libhmatrix.a \
 -DSCOTCH_INCLUDES=$SCOTCH_INSTALL/include \
 -DSCOTCH_LIBRARIES="$SCOTCH_INSTALL/lib/libscotch.a;$SCOTCH_INSTALL/lib/libscotcherr.a;$SCOTCH_INSTALL/lib/libptscotch.a;$SCOTCH_INSTALL/lib/libptscotcherr.a"
 elif [[ $1 == "edison" ]];
