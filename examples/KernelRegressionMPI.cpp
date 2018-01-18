@@ -535,7 +535,7 @@ void recursive_pca(double *p, int n, int d, int cluster_size,
 extern "C" {
   void FC_GLOBAL_(h_matrix_fill,H_MATRIX_FILL)
     (int* Npo, int* Ndim, double* Locations,
-     int* Nmin, double* tol, double* h, double* lam, int* nth);
+     int* Nmin, double* tol, double* h, double* lam, int* nth, int* nmpi);
   void FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
     (int* Npo, int* Ncol, double* Xin, double* Xout);
 }
@@ -553,21 +553,28 @@ public:
   double _h = 0.;
   double _l = 0.;
   int _ctxt_all = -1;
+  
+  //if (!mpi_rank())
+  //    cout << "# Start construction called: <KernelMPI>..." << endl;
+  
   KernelMPI() = default;
   KernelMPI(vector<double> data, int d, double h, double l,
-            HSSOptions<double>& opts, int ctxt_all)
+            HSSOptions<double>& opts, int ctxt_all, int nmpi)
     : _data(move(data)), _d(d), _n(_data.size() / _d),
       _h(h), _l(l), _ctxt_all(ctxt_all) {
     assert(size_t(_n * _d) == _data.size());
 
 #if defined(FAST_H_SAMPLING)
+    if (!mpi_rank())
+        cout << "# Called <FAST_H_SAMPLING> Started matrix construction..." << endl;
+    
     auto starttime = MPI_Wtime();
-    int Nmin = 500;    // finest leafsize
-    double tol = 1e-12; // compression tolerance
-    //double tol = opts.rel_tol(); // compression tolerance
+    int Nmin = 512;    // finest leafsize
+    // double tol = 1e-12; // compression tolerance
+    double tol = opts.rel_tol(); // compression tolerance
     int nth = omp_get_max_threads();
     FC_GLOBAL_(h_matrix_fill,H_MATRIX_FILL)
-      (&_n, &_d, _data.data(), &Nmin, &tol, &h, &l, &nth);
+      (&_n, &_d, _data.data(), &Nmin, &tol, &h, &l, &nth, &nmpi);
     auto endtime = MPI_Wtime();
     if (!mpi_rank())
       cout << "# H Matrix construction time " << endtime - starttime
@@ -699,10 +706,11 @@ int main(int argc, char *argv[]) {
   scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, P);
 
   string filename("smalltest.dat");
-  int d = 2;
+  int d = 8;
   string reorder("natural");
-  double h = 3.;
-  double lambda = 1.;
+  double h = 1.;
+  double lambda = 20.;
+  int nmpi = 32; // Number of MPI ranks for H compression
   int kernel = 1; // Gaussian=1, Laplace=2
   double total_time = 0.;
 
@@ -722,6 +730,8 @@ int main(int argc, char *argv[]) {
     reorder = string(argv[5]);
   if (argc > 6)
     lambda = stof(argv[6]);
+  if (argc > 7)
+    nmpi = stoi(argv[7]);
   if (!mpi_rank()) {
     cout << "# data dimension = " << d << endl;
     cout << "# kernel h = " << h << endl;
@@ -729,6 +739,7 @@ int main(int argc, char *argv[]) {
     cout << "# kernel type = "
          << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
     cout << "# reordering/clustering = " << reorder << endl;
+    cout << "# nmpi = " << nmpi << endl;
   }
 
   HSSOptions<double> hss_opts;
@@ -770,7 +781,7 @@ int main(int argc, char *argv[]) {
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
   timer.start();
-  KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts, ctxt_all);
+  KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts, ctxt_all, nmpi);
 
   if (reorder != "natural")
     K = new HSSMatrixMPI<double>
@@ -833,6 +844,8 @@ int main(int argc, char *argv[]) {
     cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
          << Bchecknorm << endl;
 
+  
+  cout << "# Starting prediction step" << endl;
   double* prediction = new double[m];
   std::fill(prediction, prediction+m, 0.);
 
