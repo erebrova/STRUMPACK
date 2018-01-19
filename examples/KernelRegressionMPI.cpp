@@ -535,7 +535,7 @@ void recursive_pca(double *p, int n, int d, int cluster_size,
 extern "C" {
   void FC_GLOBAL_(h_matrix_fill,H_MATRIX_FILL)
     (int* Npo, int* Ndim, double* Locations,
-     int* Nmin, double* tol, double* h, double* lam, int* nth, int* nmpi);
+     int* Nmin, double* tol, double* h, double* lam, int* nth, int* nmpi, int* aca);
   void FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
     (int* Npo, int* Ncol, double* Xin, double* Xout);
 }
@@ -554,9 +554,6 @@ public:
   double _l = 0.;
   int _ctxt_all = -1;
   
-  //if (!mpi_rank())
-  //    cout << "# Start construction called: <KernelMPI>..." << endl;
-  
   KernelMPI() = default;
   KernelMPI(vector<double> data, int d, double h, double l,
             HSSOptions<double>& opts, int ctxt_all, int nmpi)
@@ -564,17 +561,15 @@ public:
       _h(h), _l(l), _ctxt_all(ctxt_all) {
     assert(size_t(_n * _d) == _data.size());
 
-#if defined(FAST_H_SAMPLING)
-    if (!mpi_rank())
-        cout << "# Called <FAST_H_SAMPLING> Started matrix construction..." << endl;
-    
+#if defined(FAST_H_SAMPLING)   
     auto starttime = MPI_Wtime();
     int Nmin = 512;    // finest leafsize
+    int aca = 1; // 1: basic 2: additional tests 3: full ACA
     // double tol = 1e-12; // compression tolerance
     double tol = opts.rel_tol(); // compression tolerance
     int nth = omp_get_max_threads();
     FC_GLOBAL_(h_matrix_fill,H_MATRIX_FILL)
-      (&_n, &_d, _data.data(), &Nmin, &tol, &h, &l, &nth, &nmpi);
+      (&_n, &_d, _data.data(), &Nmin, &tol, &h, &l, &nth, &nmpi, &aca);
     auto endtime = MPI_Wtime();
     if (!mpi_rank())
       cout << "# H Matrix construction time " << endtime - starttime
@@ -604,9 +599,13 @@ public:
   void operator()(DistM_t &R, DistM_t &Sr, DistM_t &Sc) {
     auto starttime = MPI_Wtime();
     int Ncol = R.cols();
-    auto Rseq = R.all_gather(_ctxt_all);
-    //auto Rseq = R.gather();
-    DenseM_t Srseq(_n, Ncol);
+    if (!mpi_rank()) cout << "# before (all_gather / gather)" << endl;
+    // auto Rseq = R.all_gather(_ctxt_all);
+    auto Rseq = R.gather();
+    if (!mpi_rank()) cout << "# after (all_gather / gather)" << endl;
+    DenseM_t Srseq;
+    if (!mpi_rank())
+      Srseq = DenseM_t(_n, Ncol);
     FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
       (&_n, &Ncol, Rseq.data(), Srseq.data());
     Sr.scatter(Srseq);
@@ -781,8 +780,9 @@ int main(int argc, char *argv[]) {
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
   timer.start();
-  KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts, ctxt_all, nmpi);
 
+  KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts, ctxt_all, nmpi);
+  
   if (reorder != "natural")
     K = new HSSMatrixMPI<double>
       (cluster_tree, kernel_matrix, ctxt, kernel_matrix,
@@ -844,8 +844,10 @@ int main(int argc, char *argv[]) {
     cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
          << Bchecknorm << endl;
 
+  if (!mpi_rank())
+    cout << "# Starting prediction step" << endl;
   
-  cout << "# Starting prediction step" << endl;
+  timer.start();
   double* prediction = new double[m];
   std::fill(prediction, prediction+m, 0.);
 
@@ -876,6 +878,10 @@ int main(int argc, char *argv[]) {
     double a = (prediction[i] - data_test_label[i]) / 2;
     incorrect_quant += (a > 0 ? a : -a);
   }
+
+  if (!mpi_rank())
+    cout << "# prediction time = " << timer.elapsed() << endl;
+
   if (!mpi_rank())
     cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
          << endl << endl;
