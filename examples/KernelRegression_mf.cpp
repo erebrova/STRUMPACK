@@ -684,12 +684,12 @@ int main(int argc, char *argv[]) {
   // cout << "# data_train_label.size() = " << data_train_label.size() << endl;
   // cout << "# data_valid_label.size() = " << data_valid_label.size() << endl;
   // cout << "# data_test_label.size() = " << data_test_label.size() << endl;
-
-  // int n = data_train.size() / d;
-  // int m = data_test.size() / d;
-  // cout << "# matrix size = " << n << " x " << d << endl;
-
   // exit(0);
+
+  int n = data_train.size() / d;
+  int m = data_test.size() / d;
+  cout << "# matrix size = " << n << " x " << d << endl;
+
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
@@ -706,7 +706,7 @@ int main(int argc, char *argv[]) {
                   data_train_label.data());
   }
 
-  cout << "starting HSS compression .. " << endl;
+  cout << "# starting HSS compression .. " << endl;
 
   HSSMatrix<double> K;
   if (reorder != "natural")
@@ -751,12 +751,20 @@ int main(int argc, char *argv[]) {
   total_time += timer.elapsed();
   cout << "# total time: " << total_time << endl;
 
-  auto Bcheck = K.apply(weights);
+  // cout << "weights.rows() = " << weights.rows() << endl;
+  // cout << "weights.cols() = " << weights.cols() << endl;
+  // cout << "weights.ld() = " << weights.ld() << endl;
 
+  // Check backward error
+  auto Bcheck = K.apply(weights);
   Bcheck.scaled_add(-1., B);
   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
        << Bcheck.normF() / B.normF() << endl;
 
+  cout << "# Starting prediction..." << timer.elapsed() << endl;
+  timer.start();
+  // cout << "m = " << m << endl;
+  // cout << "n = " << n << endl;
   double *prediction = new double[m];
   for (int i = 0; i < m; ++i) {
     prediction[i] = 0;
@@ -765,9 +773,7 @@ int main(int argc, char *argv[]) {
   if (kernel == 1) {
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
-        prediction[c] +=
-            Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-            weights(r, 0);
+        prediction[c] += Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) * weights(r, 0);
   } else {
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
@@ -776,17 +782,26 @@ int main(int argc, char *argv[]) {
             weights(r, 0);
   }
 
+  for (int i = 0; i < 10; ++i) {
+    cout << "prediction[" << i << "] = "<< prediction[i] << endl;
+  }
+
+  // check if positive or negative
   for (int i = 0; i < m; ++i) {
     prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
   }
+
   // compute accuracy score of prediction
   double incorrect_quant = 0;
   for (int i = 0; i < m; ++i) {
     double a = (prediction[i] - data_test_label[i]) / 2;
     incorrect_quant += (a > 0 ? a : -a);
   }
+  
+  cout << "# prediction time = " << timer.elapsed() << endl;
   cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
-       << endl << endl;;
+       << endl << endl;
+
 
   return 0;
 }
