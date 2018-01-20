@@ -715,7 +715,7 @@ int main(int argc, char *argv[]) {
   double total_time = 0.;
 
   if (!mpi_rank())
-    cout << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) "
+    cout << "# usage: ./KernelRegressionMPI file d h kernel(1=Gauss,2=Laplace) "
       "reorder(natural, 2means, kd, pca) lambda"
          << endl;
   if (argc > 1)
@@ -883,12 +883,14 @@ int main(int argc, char *argv[]) {
          << Bchecknorm << endl;
 
 
-  cout << "# Starting prediction step" << endl;
+  if (!mpi_rank())
+    cout << "# Starting prediction step" << endl;
   double* prediction = new double[m];
   std::fill(prediction, prediction+m, 0.);
 
   auto wseq = wdist.gather();
   if (!mpi_rank()) {
+    timer.start();
     if (kernel == 1) {
       for (int c = 0; c < m; c++) {
         for (int r = 0; r < n; r++) {
@@ -915,6 +917,7 @@ int main(int argc, char *argv[]) {
       double a = (prediction[i] - data_test_label[i]) / 2;
       incorrect_quant += (a > 0 ? a : -a);
     }
+    cout << "# prediction time = " << timer.elapsed() << endl;
     cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
          << endl << endl;
   }
