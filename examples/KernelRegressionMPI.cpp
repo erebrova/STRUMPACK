@@ -553,10 +553,10 @@ public:
   double _h = 0.;
   double _l = 0.;
   int _ctxt_all = -1;
-  
+
   //if (!mpi_rank())
   //    cout << "# Start construction called: <KernelMPI>..." << endl;
-  
+
   KernelMPI() = default;
   KernelMPI(vector<double> data, int d, double h, double l,
             HSSOptions<double>& opts, int ctxt_all, int nmpi)
@@ -567,7 +567,7 @@ public:
 #if defined(FAST_H_SAMPLING)
     if (!mpi_rank())
         cout << "# Called <FAST_H_SAMPLING> Started matrix construction..." << endl;
-    
+
     auto starttime = MPI_Wtime();
     int Nmin = 512;    // finest leafsize
     // double tol = 1e-12; // compression tolerance
@@ -844,42 +844,42 @@ int main(int argc, char *argv[]) {
     cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
          << Bchecknorm << endl;
 
-  
+
   cout << "# Starting prediction step" << endl;
   double* prediction = new double[m];
   std::fill(prediction, prediction+m, 0.);
 
-  if (kernel == 1) {
-    for (int c = 0; c < m; c++) {
-      for (int r = 0; r < n; r++) {
-        prediction[c] +=
-          Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-          weights(r, 0);
+  auto wseq = wdist.gather();
+  if (!mpi_rank()) {
+    if (kernel == 1) {
+      for (int c = 0; c < m; c++) {
+        for (int r = 0; r < n; r++) {
+          prediction[c] +=
+            Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+            wseq(r, 0);
+        }
+      }
+    } else {
+      for (int c = 0; c < m; c++) {
+        for (int r = 0; r < n; r++) {
+          prediction[c] +=
+            Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+            wseq(r, 0);
+        }
       }
     }
-  } else {
-    for (int c = 0; c < m; c++) {
-      for (int r = 0; r < n; r++) {
-        prediction[c] +=
-          Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-          wdist(r, 0);
-      }
+    for (int i = 0; i < m; ++i)
+      prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
+
+    // compute accuracy score of prediction
+    double incorrect_quant = 0;
+    for (int i = 0; i < m; ++i) {
+      double a = (prediction[i] - data_test_label[i]) / 2;
+      incorrect_quant += (a > 0 ? a : -a);
     }
-  }
-
-  for (int i = 0; i < m; ++i)
-    prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
-
-  // compute accuracy score of prediction
-  double incorrect_quant = 0;
-  for (int i = 0; i < m; ++i) {
-    double a = (prediction[i] - data_test_label[i]) / 2;
-    incorrect_quant += (a > 0 ? a : -a);
-  }
-  if (!mpi_rank())
     cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
          << endl << endl;
-
+  }
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
