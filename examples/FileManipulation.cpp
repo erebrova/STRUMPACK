@@ -97,7 +97,7 @@ void read_and_normalize_data(const string &filename, int dim, int start, int end
 
 		// Normalize each column
 		for (cntCols = 0; cntCols < dim; ++cntCols) {
-			vec_normalize( data[cntCols] );
+			vec_normalize( data[cntCols] ); //XXX
 			// check_normalization( data[cntCols] );
 		}
 
