@@ -43,7 +43,7 @@ using namespace strumpack;
 using namespace strumpack::HSS;
 
 // uncomment this to do the slow, straightforward sampling
-#define FAST_H_SAMPLING 1
+// #define FAST_H_SAMPLING 1
 
 #if defined(FAST_H_SAMPLING)
 #if defined(_OPENMP)
@@ -755,8 +755,46 @@ int main(int argc, char *argv[]) {
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
+
   if (!mpi_rank())
     cout << "# matrix size = " << n << " x " << d << endl;
+
+
+  // GC: New stuff
+
+  // const int NR_ITEMS=m;
+  // int i;
+  // int rank  = mpi_rank();
+  // int *bins;
+  // int buckets = 0;
+  // int remainder = 0;
+
+  // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  // bins = (int*) malloc(P * sizeof(int));
+
+  // // Splitting vector of size 'NR_ITEMS' across 'P' processors
+  // int nr_alloced = 0;
+  // for (i=0; i<P; i++) {
+  //   remainder = NR_ITEMS - nr_alloced;
+  //   buckets = (P - i);
+  //   bins[i] = remainder / buckets;
+  //   nr_alloced += bins[i];
+  // }
+
+  // // Compute start and end of each rank
+  // int start = 0;
+  // int end = 0;
+  // for (i=0; i<rank; i++)
+  //   start += bins[i];
+  // end = start + bins[rank];
+
+  // cout << "size(R" << rank << ") = "<< bins[rank] << " start[" << start << ","<< end << "]end" << endl;
+
+  // MPI_Finalize();
+  // exit(0);
+
+  // New stuff
+
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
