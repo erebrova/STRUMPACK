@@ -892,6 +892,7 @@ int main(int argc, char *argv[]) {
   timer.start();
   if (kernel == 1) {
     if (wdist.active() && wdist.lcols() > 0)
+#pragma omp parallel for
       for (int c = 0; c < m; c++) {
         for (int r = 0; r < wdist.lrows(); r++) {
           prediction[c] +=
@@ -902,6 +903,7 @@ int main(int argc, char *argv[]) {
       }
   } else {
     if (wdist.active() && wdist.lcols() > 0)
+#pragma omp parallel for
       for (int c = 0; c < m; c++) {
         for (int r = 0; r < wdist.lrows(); r++) {
           prediction[c] +=
@@ -914,11 +916,13 @@ int main(int argc, char *argv[]) {
   MPI_Allreduce
     (MPI_IN_PLACE, prediction, m, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
+#pragma omp parallel for
   for (int i = 0; i < m; ++i)
     prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
 
   // compute accuracy score of prediction
   double incorrect_quant = 0;
+#pragma omp parallel for reduction(+:incorrect_quant)
   for (int i = 0; i < m; ++i) {
     double a = (prediction[i] - data_test_label[i]) / 2;
     incorrect_quant += (a > 0 ? a : -a);
