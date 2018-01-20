@@ -715,7 +715,7 @@ int main(int argc, char *argv[]) {
   double total_time = 0.;
 
   if (!mpi_rank())
-    cout << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) "
+    cout << "# usage: ./KernelRegressionMPI file d h kernel(1=Gauss,2=Laplace) "
       "reorder(natural, 2means, kd, pca) lambda"
          << endl;
   if (argc > 1)
@@ -889,6 +889,7 @@ int main(int argc, char *argv[]) {
   double* prediction = new double[m];
   std::fill(prediction, prediction+m, 0.);
 
+  timer.start();
   if (kernel == 1) {
     if (wdist.active() && wdist.lcols() > 0)
       for (int c = 0; c < m; c++) {
@@ -922,10 +923,11 @@ int main(int argc, char *argv[]) {
     double a = (prediction[i] - data_test_label[i]) / 2;
     incorrect_quant += (a > 0 ? a : -a);
   }
-  if (!mpi_rank())
+  if (!mpi_rank()) {
+    cout << "# prediction time = " << timer.elapsed() << endl;
     cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
          << endl << endl;
-
+  }
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;

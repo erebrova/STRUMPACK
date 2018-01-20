@@ -623,7 +623,7 @@ int main(int argc, char *argv[]) {
   double total_time;
   string mode("valid");
 
-  cout << "# usage: ./KernelRegression file d h lambda "
+  cout << "# usage: ./KernelRegression_mf file d h lambda "
           "kernel(1=Gauss,2=Laplace) "
           "reorder(natural, 2means, kd, pca) mode(valid, test)"
        << endl;
@@ -761,7 +761,7 @@ int main(int argc, char *argv[]) {
   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
        << Bcheck.normF() / B.normF() << endl;
 
-  cout << "# Starting prediction..." << timer.elapsed() << endl;
+  cout << "# Starting prediction..." << endl;
   timer.start();
   // cout << "m = " << m << endl;
   // cout << "n = " << n << endl;
@@ -780,10 +780,6 @@ int main(int argc, char *argv[]) {
         prediction[c] +=
             Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
             weights(r, 0);
-  }
-
-  for (int i = 0; i < 10; ++i) {
-    cout << "prediction[" << i << "] = "<< prediction[i] << endl;
   }
 
   // check if positive or negative
