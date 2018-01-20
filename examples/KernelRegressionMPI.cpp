@@ -883,41 +883,49 @@ int main(int argc, char *argv[]) {
          << Bchecknorm << endl;
 
 
-  cout << "# Starting prediction step" << endl;
+  if (!mpi_rank())
+    cout << "# Starting prediction step" << endl;
+
   double* prediction = new double[m];
   std::fill(prediction, prediction+m, 0.);
 
-  auto wseq = wdist.gather();
-  if (!mpi_rank()) {
-    if (kernel == 1) {
+  if (kernel == 1) {
+    if (wdist.active() && wdist.lcols() > 0)
       for (int c = 0; c < m; c++) {
-        for (int r = 0; r < n; r++) {
+        for (int r = 0; r < wdist.lrows(); r++) {
           prediction[c] +=
-            Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-            wseq(r, 0);
+            Gauss_kernel
+            (&data_train[wdist.rowl2g(r) * d], &data_test[c * d], d, h)
+            * wdist(r, 0);
         }
       }
-    } else {
+  } else {
+    if (wdist.active() && wdist.lcols() > 0)
       for (int c = 0; c < m; c++) {
-        for (int r = 0; r < n; r++) {
+        for (int r = 0; r < wdist.lrows(); r++) {
           prediction[c] +=
-            Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-            wseq(r, 0);
+            Laplace_kernel
+            (&data_train[wdist.rowl2g(r) * d], &data_test[c * d], d, h)
+            * wdist(r, 0);
         }
       }
-    }
-    for (int i = 0; i < m; ++i)
-      prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
+  }
+  MPI_Allreduce
+    (MPI_IN_PLACE, prediction, m, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-    // compute accuracy score of prediction
-    double incorrect_quant = 0;
-    for (int i = 0; i < m; ++i) {
-      double a = (prediction[i] - data_test_label[i]) / 2;
-      incorrect_quant += (a > 0 ? a : -a);
-    }
+  for (int i = 0; i < m; ++i)
+    prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
+
+  // compute accuracy score of prediction
+  double incorrect_quant = 0;
+  for (int i = 0; i < m; ++i) {
+    double a = (prediction[i] - data_test_label[i]) / 2;
+    incorrect_quant += (a > 0 ? a : -a);
+  }
+  if (!mpi_rank())
     cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
          << endl << endl;
-  }
+
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
