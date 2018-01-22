@@ -685,9 +685,9 @@ int main(int argc, char *argv[]) {
   // cout << "# data_valid_label.size() = " << data_valid_label.size() << endl;
   // cout << "# data_test_label.size() = " << data_test_label.size() << endl;
 
-  // int n = data_train.size() / d;
-  // int m = data_test.size() / d;
-  // cout << "# matrix size = " << n << " x " << d << endl;
+  int n = data_train.size() / d;
+  int m = data_test.size() / d;
+  cout << "# matrix size = " << n << " x " << d << endl;
 
   // exit(0);
 
