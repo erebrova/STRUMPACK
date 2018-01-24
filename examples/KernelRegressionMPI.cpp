@@ -43,7 +43,7 @@ using namespace strumpack;
 using namespace strumpack::HSS;
 
 // uncomment this to do the slow, straightforward sampling
-// #define FAST_H_SAMPLING 1
+#define FAST_H_SAMPLING 1
 
 #if defined(FAST_H_SAMPLING)
 #if defined(_OPENMP)
@@ -710,7 +710,14 @@ int main(int argc, char *argv[]) {
   string reorder("natural");
   double h = 1.;
   double lambda = 20.;
-  int nmpi = 32; // Number of MPI ranks for H compression
+  int nmpi = 0; // Number of MPI ranks for H compression
+
+  if (P>32)
+  	nmpi = 32;
+  else {
+  	nmpi = P;
+  }
+
   int kernel = 1; // Gaussian=1, Laplace=2
   double total_time = 0.;
 
@@ -741,10 +748,17 @@ int main(int argc, char *argv[]) {
     cout << "# reordering/clustering = " << reorder << endl;
     cout << "# nmpi = " << nmpi << endl;
   }
+  
+  TaskTimer::t_begin = GET_TIME_NOW();
+  TaskTimer timer(string("compression"), 1);
 
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
+
+  if (!mpi_rank())
+    cout << "# Reading data..." << endl;
+  timer.start();
 
   vector<double> data_train = write_from_file(filename + "_train.csv");
   vector<double> data_test = write_from_file(filename + "_test.csv");
@@ -753,48 +767,14 @@ int main(int argc, char *argv[]) {
   vector<double> data_test_label =
       write_from_file(filename + "_test_label.csv");
 
+  if (!mpi_rank())
+    cout << "# Reading took " << timer.elapsed() << endl;
+
   int n = data_train.size() / d;
   int m = data_test.size() / d;
 
   if (!mpi_rank())
     cout << "# matrix size = " << n << " x " << d << endl;
-
-
-  // GC: New stuff
-
-  // const int NR_ITEMS=m;
-  // int i;
-  // int rank  = mpi_rank();
-  // int *bins;
-  // int buckets = 0;
-  // int remainder = 0;
-
-  // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  // bins = (int*) malloc(P * sizeof(int));
-
-  // // Splitting vector of size 'NR_ITEMS' across 'P' processors
-  // int nr_alloced = 0;
-  // for (i=0; i<P; i++) {
-  //   remainder = NR_ITEMS - nr_alloced;
-  //   buckets = (P - i);
-  //   bins[i] = remainder / buckets;
-  //   nr_alloced += bins[i];
-  // }
-
-  // // Compute start and end of each rank
-  // int start = 0;
-  // int end = 0;
-  // for (i=0; i<rank; i++)
-  //   start += bins[i];
-  // end = start + bins[rank];
-
-  // cout << "size(R" << rank << ") = "<< bins[rank] << " start[" << start << ","<< end << "]end" << endl;
-
-  // MPI_Finalize();
-  // exit(0);
-
-  // New stuff
-
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
@@ -816,8 +796,6 @@ int main(int argc, char *argv[]) {
 
   HSSMatrixMPI<double>* K = nullptr;
 
-  TaskTimer::t_begin = GET_TIME_NOW();
-  TaskTimer timer(string("compression"), 1);
   timer.start();
 
   KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts, ctxt_all, nmpi);
