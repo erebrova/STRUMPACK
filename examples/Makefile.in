@@ -1,6 +1,4 @@
-all: MLkernel MLkernel_matrixfree KernelRegression \
-KernelRegression_mf KernelMatrixCompression mtx2bin bin2mtx \
-KernelRegressionMPI
+all: KernelRegression_mf KernelRegressionMPI
 
 all_default: sexample dexample cexample zexample testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble		\

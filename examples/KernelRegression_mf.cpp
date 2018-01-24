@@ -34,7 +34,9 @@
 
 #include "HSS/HSSMatrix.hpp"
 #include "misc/TaskTimer.hpp"
+
 #include "FileManipulation.h"
+#include <fstream>
 
 using namespace std;
 using namespace strumpack;
@@ -613,6 +615,54 @@ vector<double> write_from_file(string filename) {
   return data;
 }
 
+bool save_vector_to_binary_file( const vector<double> data, size_t length, const string& file_path )
+{
+    ofstream fileOut(file_path.c_str(), ios::binary | ios::out | ios::app);
+    if ( !fileOut.is_open() )
+        return false;
+    fileOut.write((char*)&data[0], streamsize(length*sizeof(double)));
+    fileOut.close();
+    return true;
+}
+
+bool read_vector_from_binary_file( const vector<double> &data, size_t length, const string& file_path)
+{
+    ifstream is(file_path.c_str(), ios::binary | ios::in);
+    if ( !is.is_open() )
+        return false;
+    is.read( (char*)&data[0], streamsize(length*sizeof(double)));
+    is.close();
+    return true;
+}
+
+void save_to_binary_file(string FILE, size_t n, int d){
+
+  string bin_FILE = FILE + ".bin";
+  cout << "Creating file: " << bin_FILE << endl;
+  vector<double> data = write_from_file(FILE); // read
+
+  // Debug: Print out data
+  // cout << "To write:" << endl;
+  // for (int i = 0; i < n*d; ++i){
+  //   cout << data[i] << " ";
+  //   if ((i+1)%d == 0)
+  //     cout << endl;
+  // }
+
+  save_vector_to_binary_file(data, n*d, bin_FILE);
+
+  // vector<double> read_data(n*d);
+  // read_vector_from_binary_file(read_data, n*d, bin_FILE);
+
+  // cout << "Read:" << endl;
+  // for (int i = 0; i < 10*d; ++i){
+  //   cout << read_data[i] << " ";
+  //   if ((i+1)%d == 0)
+  //     cout << endl;
+  // }
+
+}
+
 int main(int argc, char *argv[]) {
   string filename("smalltest.dat");
   int d = 2;
@@ -623,10 +673,11 @@ int main(int argc, char *argv[]) {
   double total_time;
   string mode("valid");
 
-  cout << "# usage: ./KernelRegression file d h lambda "
-          "kernel(1=Gauss,2=Laplace) "
-          "reorder(natural, 2means, kd, pca) mode(valid, test)"
+  cout << "# usage: ./KernelRegression_mf file d h lambda "
+          "kern(1=Gau,2=Lapl) "
+          "reorder(nat, 2mea, kd, pca) mode(valid, test)"
        << endl;
+
   if (argc > 1)
     filename = string(argv[1]);
   if (argc > 2)
@@ -641,34 +692,72 @@ int main(int argc, char *argv[]) {
     reorder = string(argv[6]);
   if (argc > 7)
     mode = string(argv[7]);
+
   cout << "# data dimension = " << d << endl;
   cout << "# kernel h = " << h << endl;
   cout << "# lambda = " << lambda << endl;
   cout << "# kernel type = " << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
   cout << "# reordering/clustering = " << reorder << endl;
   cout << "# validation/test = " << mode << endl;
+  
+  TaskTimer::t_begin = GET_TIME_NOW();
+  TaskTimer timer(string("compression"), 1);
 
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
 
-  vector<double> data_train = write_from_file(filename + "_train.csv");
-  vector<double> data_test = write_from_file(filename + "_" + mode + ".csv");
-  vector<double> data_train_label =
-      write_from_file(filename + "_train_label.csv");
-  vector<double> data_test_label =
-      write_from_file(filename + "_" + mode + "_label.csv"); 
+  cout << "# Reading data..." << endl;
+  timer.start();
 
+  string data_train_dat_FILE = filename + "_train.csv";
+  string data_train_lab_FILE = filename + "_train_label.csv";
+  string data_test_dat_FILE  = filename + "_" + mode + ".csv";
+  string data_test_lab_FILE  = filename + "_" + mode + "_label.csv";
+
+  // // // Read from csv file
+  vector<double> data_train       = write_from_file(data_train_dat_FILE);
+  vector<double> data_train_label = write_from_file(data_train_lab_FILE);
+  vector<double> data_test        = write_from_file(data_test_dat_FILE);
+  vector<double> data_test_label  = write_from_file(data_test_lab_FILE);
+
+  // // // Save csv file to binary file
+  // save_to_binary_file(data_train_dat_FILE, count_lines(data_train_dat_FILE), d); //data
+  // save_to_binary_file(data_train_lab_FILE, count_lines(data_train_lab_FILE), 1); //labels
+  // save_to_binary_file(data_test_dat_FILE, count_lines(data_test_dat_FILE), d); //data
+  // save_to_binary_file(data_test_lab_FILE, count_lines(data_test_lab_FILE), 1); //labels
+
+  // Size of training and testing datasets
+  // size_t ntrain = count_lines(data_train_lab_FILE);
+  // size_t ntest  = count_lines(data_test_lab_FILE);
+  // cout << "ntrain = " << ntrain << endl;
+  // cout << "ntest = " << ntest << endl;
+
+  // vector<double> data_train(ntrain*d);
+  // vector<double> data_train_label(ntrain*1);
+  // vector<double> data_test(ntest*d);
+  // vector<double> data_test_label(ntest*1);
+
+  // // Read from binary file
+  // read_vector_from_binary_file(data_train,        ntrain*d, data_train_dat_FILE+".bin");
+  // read_vector_from_binary_file(data_train_label,  ntrain*1, data_train_lab_FILE+".bin");
+  // read_vector_from_binary_file(data_test,         ntest*d,  data_test_dat_FILE+".bin");
+  // read_vector_from_binary_file(data_test_label,   ntest*1,  data_test_lab_FILE+".bin");
+
+  cout << "# Reading took " << timer.elapsed() << endl;
+
+  // New normalization
   // size_t training   = 10000;
   // size_t testing    = 1000;
   // size_t validation = 0; 
 
   // vector<double> data_train; 
-  // vector<double> data_test;
-  // vector<double> data_valid;
-
   // vector<double> data_train_label;
+  
+  // vector<double> data_test;
   // vector<double> data_test_label;
+  
+  // vector<double> data_valid;
   // vector<double> data_valid_label;
 
   // string filename_DATA   = "/Users/gichavez/Desktop/susy10k/susy_10Kn_train.csv";
@@ -684,12 +773,12 @@ int main(int argc, char *argv[]) {
   // cout << "# data_train_label.size() = " << data_train_label.size() << endl;
   // cout << "# data_valid_label.size() = " << data_valid_label.size() << endl;
   // cout << "# data_test_label.size() = " << data_test_label.size() << endl;
+  // exit(0);
+  // New normalization
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
   cout << "# matrix size = " << n << " x " << d << endl;
-
-  // exit(0);
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
@@ -715,8 +804,6 @@ int main(int argc, char *argv[]) {
     K = HSSMatrix<double>(n, n, hss_opts);
   }
 
-  TaskTimer::t_begin = GET_TIME_NOW();
-  TaskTimer timer(string("compression"), 1);
   timer.start();
   //  K.compress(Kdense, hss_opts);
   Kernel kernel_matrix(data_train, d, h, lambda);
@@ -757,6 +844,9 @@ int main(int argc, char *argv[]) {
   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
        << Bcheck.normF() / B.normF() << endl;
 
+  cout << "# Starting prediction step " << endl;
+  timer.start();
+
   double *prediction = new double[m];
   for (int i = 0; i < m; ++i) {
     prediction[i] = 0;
@@ -779,14 +869,19 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < m; ++i) {
     prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
   }
+
   // compute accuracy score of prediction
   double incorrect_quant = 0;
   for (int i = 0; i < m; ++i) {
     double a = (prediction[i] - data_test_label[i]) / 2;
     incorrect_quant += (a > 0 ? a : -a);
   }
+
+  cout << "# Prediction took " << timer.elapsed() << endl;
   cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
-       << endl << endl;;
+       << endl << endl;
 
   return 0;
 }
+
+

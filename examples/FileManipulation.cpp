@@ -40,12 +40,12 @@ double vec_normalize( vector<double>& v ){
 	std::transform(v.begin(), v.end(), v.begin(), [stdev](double x) { return x/stdev; });
 }
 
-inline size_t count_lines( const string &filename ){
+size_t count_lines( const string &filename ){
 	size_t count_lines = 0;
 	ifstream file( filename );
 	count_lines = std::count( std::istreambuf_iterator<char>( file ), std::istreambuf_iterator<char>(), '\n' );
 	file.close();
-	cout << "# File " << filename << " has " << count_lines << " lines" << endl;
+	// cout << "# File " << filename << " has " << count_lines << " lines" << endl;
 	return count_lines;
 }
 

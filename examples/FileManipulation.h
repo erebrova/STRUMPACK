@@ -20,7 +20,7 @@ void check_normalization( const vector<double>& v );
 
 double vec_normalize( vector<double>& v );
 
-inline size_t count_lines( const string &filename );
+size_t count_lines( const string &filename );
 
 void disp_column_check_normalization( const vector<double>& v, int col, int dim, size_t n);
 
