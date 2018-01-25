@@ -864,6 +864,9 @@ int main(int argc, char *argv[]) {
     cout << "# ACA = " << ACA << endl;
   }
 
+  TaskTimer::t_begin = GET_TIME_NOW();
+  TaskTimer timer(string("compression"), 1);
+
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
@@ -883,7 +886,8 @@ int main(int argc, char *argv[]) {
 
   if (!mpi_rank())
     cout << "# Preprocessing data..." << endl;
-
+  timer.start();
+  
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
@@ -979,6 +983,7 @@ int main(int argc, char *argv[]) {
 
   if (!mpi_rank())
     cout << "# Starting prediction step" << endl;
+  timer.start();
 
   double* prediction = new double[m];
   std::fill(prediction, prediction+m, 0.);
