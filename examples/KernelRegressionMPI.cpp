@@ -776,6 +776,9 @@ int main(int argc, char *argv[]) {
   if (!mpi_rank())
     cout << "# matrix size = " << n << " x " << d << endl;
 
+  if (!mpi_rank())
+    cout << "# Preprocessing data..." << endl;
+
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
@@ -792,11 +795,14 @@ int main(int argc, char *argv[]) {
   }
 
   if (!mpi_rank())
-    cout << "starting HSS compression .. " << endl;
+    cout << "# Preprocessing took " << timer.elapsed() << endl;
+
+  if (!mpi_rank())
+    cout << "# HSS compression .. " << endl;
+  timer.start();
 
   HSSMatrixMPI<double>* K = nullptr;
 
-  timer.start();
 
   KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts, ctxt_all, nmpi);
   
@@ -809,9 +815,6 @@ int main(int argc, char *argv[]) {
       (n, n, kernel_matrix, ctxt, kernel_matrix,
        hss_opts, MPI_COMM_WORLD);
 
-  if (!mpi_rank())
-    cout << "# compression time = " << timer.elapsed() << endl;
-  total_time += timer.elapsed();
 
   if (K->is_compressed()) {
     // reduction over all processors
@@ -831,6 +834,11 @@ int main(int argc, char *argv[]) {
   }
 
   if (!mpi_rank())
+    cout << "#HSS compression took " << timer.elapsed() << endl;
+  total_time += timer.elapsed();
+
+  // Starting factorization
+  if (!mpi_rank())
     cout << "factorization start" << endl;
   timer.start();
   auto ULV = K->factor();
@@ -844,14 +852,14 @@ int main(int argc, char *argv[]) {
   DistributedMatrix<double> wdist(ctxt, weights);
 
   if (!mpi_rank())
-    cout << "solution start" << endl;
+    cout << "solve start" << endl;
   timer.start();
   K->solve(ULV, wdist);
   if (!mpi_rank())
     cout << "# solve time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
   if (!mpi_rank())
-    cout << "# total time: " << total_time << endl;
+    cout << "# total time (comp + fact): " << total_time << endl;
 
   auto Bcheck = K->apply(wdist);
 
@@ -906,7 +914,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (!mpi_rank())
-    cout << "# prediction time = " << timer.elapsed() << endl;
+    cout << "# prediction took " << timer.elapsed() << endl;
 
   if (!mpi_rank())
     cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
