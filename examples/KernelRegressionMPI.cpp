@@ -535,7 +535,9 @@ void recursive_pca(double *p, int n, int d, int cluster_size,
 extern "C" {
   void FC_GLOBAL_(h_matrix_fill,H_MATRIX_FILL)
     (int* Npo, int* Ndim, double* Locations,
-     int* Nmin, double* tol, double* h, double* lam, int* nth, int* nmpi, int* aca);
+     int* Nmin, double* tol, double* h, double* lam,
+     int* nth, int* nmpi, int* ninc,
+     int* aca, int* perm, int* myseg);
   void FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
     (int* Npo, int* Ncol, double* Xin, double* Xout);
 }
@@ -553,26 +555,50 @@ public:
   double _h = 0.;
   double _l = 0.;
   int _ctxt_all = -1;
+  int _prows = -1;
+  int _pcols = -1;
+  std::vector<int> _Hperm;
+  std::vector<int> _iHperm;
+  int _Hrows = 0;
+  vector<int> _dist;
+
 
   KernelMPI() = default;
   KernelMPI(vector<double> data, int d, double h, double l,
-            HSSOptions<double>& opts, int ctxt_all, int nmpi)
+            HSSOptions<double>& opts, int ctxt_all, 
+	    int nprow, int npcol,  int nmpi, int ninc, int aca)
     : _data(move(data)), _d(d), _n(_data.size() / _d),
-      _h(h), _l(l), _ctxt_all(ctxt_all) {
+      _h(h), _l(l), _ctxt_all(ctxt_all), _prows(nprow), _pcols(npcol) {
     assert(size_t(_n * _d) == _data.size());
 
-
-#if defined(FAST_H_SAMPLING)   
+#if defined(FAST_H_SAMPLING)
+    const auto P = mpi_nprocs();
+    const auto rank = mpi_rank();
+    if (!rank)
+      cout << "# Called <FAST_H_SAMPLING> Started matrix construction..." << endl;
     auto starttime = MPI_Wtime();
-    int Nmin = 512;    // finest leafsize
-    int aca = 1; // 1: basic 2: additional tests 3: full ACA
-    // double tol = 1e-12; // compression tolerance
-    double tol = opts.rel_tol(); // compression tolerance
+    int Nmin = 500;    // finest leafsize
+    double tol = 1e-2; // compression tolerance
+    //double tol = opts.rel_tol(); // compression tolerance
     int nth = omp_get_max_threads();
+    _Hperm.resize(_n);
     FC_GLOBAL_(h_matrix_fill,H_MATRIX_FILL)
-      (&_n, &_d, _data.data(), &Nmin, &tol, &h, &l, &nth, &nmpi, &aca);
+      (&_n, &_d, _data.data(), &Nmin, &tol, &h, &l,
+       &nth, &nmpi, &ninc, &aca, _Hperm.data(), &_Hrows);
+    for (auto& i : _Hperm) i--; // Fortran to C
+    MPI_Bcast(_Hperm.data(), _n, MPI_INT, 0, MPI_COMM_WORLD);
+    _iHperm.resize(_n);
+    for (int i=0; i<_n; i++) 
+      _iHperm[_Hperm[i]] = i;
+    _dist.resize(P+1);
+    _dist[rank+1] = _Hrows;
+    MPI_Allgather
+      (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+       _dist.data()+1, 1, MPI_INT, MPI_COMM_WORLD);
+    for (int p=0; p<P; p++)
+      _dist[p+1] += _dist[p];
     auto endtime = MPI_Wtime();
-    if (!mpi_rank())
+    if (!rank)
       cout << "# H Matrix construction time " << endtime - starttime
            << " seconds" << endl;
 #endif
@@ -596,20 +622,108 @@ public:
     }
   }
 
+  DenseM_t redistribute_2D_to_1D(DistM_t& R) {
+    const auto P = mpi_nprocs();
+    const auto rank = mpi_rank();
+    const auto cols = R.cols();
+    const auto lcols = R.lcols();
+    const auto lrows = R.lrows();
+    const auto B = DistM_t::default_MB;
+    vector<vector<double>> sbuf(P);
+    { // global, local, proc
+      vector<tuple<int,int,int>> glp(lrows);
+      {
+	vector<size_t> count(P);
+	for (int r=0; r<lrows; r++) {
+	  auto gr = _Hperm[R.rowl2g(r)];
+	  auto p = -1 + distance
+	    (_dist.begin(), upper_bound(_dist.begin(), _dist.end(), gr));
+	  glp[r] = tuple<int,int,int>{gr, r, p};
+	  count[p] += lcols;
+	}
+	sort(glp.begin(), glp.end());
+	for (int p=0; p<P; p++)
+	  sbuf[p].reserve(count[p]);
+      }
+      for (int r=0; r<lrows; r++)
+	for (int c=0, lr=get<1>(glp[r]), p=get<2>(glp[r]); c<lcols; c++)
+	  sbuf[p].push_back(R(lr,c));
+    }
+    double *rbuf = nullptr, **pbuf = nullptr;
+    all_to_all_v(sbuf, rbuf, pbuf, MPI_COMM_WORLD);
+    DenseM_t R1D(_Hrows, cols);
+    vector<int> src_c(cols);
+    for (int c=0; c<cols; c++)
+      src_c[c] = ((c / B) % _pcols) * _prows;
+    for (int r=0; r<_Hrows; r++) {
+      auto gr = _iHperm[r + _dist[rank]];
+      auto src_r = (gr / B) % _prows;
+      for (int c=0; c<cols; c++)
+        R1D(r, c) = *(pbuf[src_r + src_c[c]]++);
+    }
+    delete[] pbuf;
+    delete[] rbuf;
+    return R1D;
+  }
+
+  void redistribute_1D_to_2D(DenseM_t& S1D, DistM_t& S) {
+    const auto rank = mpi_rank();
+    const auto P = mpi_nprocs();
+    const auto B = DistM_t::default_MB;
+    const auto cols = S1D.cols();
+    const auto lcols = S.lcols();
+    const auto lrows = S.lrows();
+    vector<vector<double>> sbuf(P);
+    {
+      vector<tuple<int,int,int>> glp(_Hrows);
+      for (int r=0; r<_Hrows; r++) {
+	auto gr = _iHperm[r + _dist[rank]];
+	glp[r] = tuple<int,int,int>{gr,r,(gr / B) % _prows};
+      }
+      sort(glp.begin(), glp.end());
+      vector<int> pc(cols);
+      for (int c=0; c<cols; c++)
+	pc[c] = ((c / B) % _pcols) * _prows;
+      {
+	vector<size_t> count(P);
+	for (int r=0; r<_Hrows; r++)
+	  for (int c=0, pr=get<2>(glp[r]); c<cols; c++)
+	    count[pr+pc[c]]++;
+	for (int p=0; p<P; p++) 
+	  sbuf[p].reserve(count[p]);
+      }
+      for (int r=0; r<_Hrows; r++)
+	for (int c=0, lr=get<1>(glp[r]), pr=get<2>(glp[r]); c<cols; c++)
+	  sbuf[pr+pc[c]].push_back(S1D(lr,c));
+    }
+    double *rbuf = nullptr, **pbuf = nullptr;
+    all_to_all_v(sbuf, rbuf, pbuf, MPI_COMM_WORLD);
+    for (int r=0; r<lrows; r++) {
+      auto gr = _Hperm[S.rowl2g(r)];
+      auto p = -1 + distance
+	(_dist.begin(), upper_bound(_dist.begin(), _dist.end(), gr));
+      for (int c=0; c<lcols; c++)
+	S(r,c) = *(pbuf[p]++);
+    }
+    delete[] pbuf;
+    delete[] rbuf;
+  }
+
+
 #if defined(FAST_H_SAMPLING)
+
   void operator()(DistM_t &R, DistM_t &Sr, DistM_t &Sc) {
     auto starttime = MPI_Wtime();
     int Ncol = R.cols();
-    if (!mpi_rank()) cout << "# before (all_gather / gather)" << endl;
-    // auto Rseq = R.all_gather(_ctxt_all);
-    auto Rseq = R.gather();
-    if (!mpi_rank()) cout << "# after (all_gather / gather)" << endl;
-    DenseM_t Srseq;
-    if (!mpi_rank())
-      Srseq = DenseM_t(_n, Ncol);
-    FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
-      (&_n, &Ncol, Rseq.data(), Srseq.data());
-    Sr.scatter(Srseq);
+    {
+      DenseM_t S1D(_Hrows, R.cols());
+      {
+	DenseM_t R1D = redistribute_2D_to_1D(R);
+	FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
+	  (&_n, &Ncol, R1D.data(), S1D.data());
+      }
+      redistribute_1D_to_2D(S1D, Sr);
+    }
     Sc = Sr;
     auto endtime = MPI_Wtime();
     if (!mpi_rank())
@@ -710,20 +824,15 @@ int main(int argc, char *argv[]) {
   string reorder("natural");
   double h = 1.;
   double lambda = 20.;
-  int nmpi = 0; // Number of MPI ranks for H compression
-
-  if (P>32)
-  	nmpi = 32;
-  else {
-  	nmpi = P;
-  }
-
+  int nmpi = P; // Number of MPI ranks for H compression
+  int ninc = 1; // Increment between MPI ranks for H code
+  int ACA = 1; //1: aca_basic 2:aca_withrandomtests 3:aca_full
   int kernel = 1; // Gaussian=1, Laplace=2
   double total_time = 0.;
 
   if (!mpi_rank())
     cout << "# usage: ./KernelRegressionMPI file d h kernel(1=Gauss,2=Laplace) "
-      "reorder(natural, 2means, kd, pca) lambda"
+      "reorder(natural, 2means, kd, pca) lambda nmpi ninc ACA"
          << endl;
   if (argc > 1)
     filename = string(argv[1]);
@@ -739,6 +848,10 @@ int main(int argc, char *argv[]) {
     lambda = stof(argv[6]);
   if (argc > 7)
     nmpi = stoi(argv[7]);
+  if (argc > 8)
+    ninc = stoi(argv[8]);
+  if (argc > 9)
+    ACA = stoi(argv[9]);
   if (!mpi_rank()) {
     cout << "# data dimension = " << d << endl;
     cout << "# kernel h = " << h << endl;
@@ -747,18 +860,13 @@ int main(int argc, char *argv[]) {
          << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
     cout << "# reordering/clustering = " << reorder << endl;
     cout << "# nmpi = " << nmpi << endl;
+    cout << "# ninc = " << ninc << endl;
+    cout << "# ACA = " << ACA << endl;
   }
-  
-  TaskTimer::t_begin = GET_TIME_NOW();
-  TaskTimer timer(string("compression"), 1);
 
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
-
-  if (!mpi_rank())
-    cout << "# Reading data..." << endl;
-  timer.start();
 
   vector<double> data_train = write_from_file(filename + "_train.csv");
   vector<double> data_test = write_from_file(filename + "_test.csv");
@@ -767,14 +875,48 @@ int main(int argc, char *argv[]) {
   vector<double> data_test_label =
       write_from_file(filename + "_test_label.csv");
 
-  if (!mpi_rank())
-    cout << "# Reading took " << timer.elapsed() << endl;
-
   int n = data_train.size() / d;
   int m = data_test.size() / d;
 
   if (!mpi_rank())
     cout << "# matrix size = " << n << " x " << d << endl;
+
+
+  // GC: New stuff
+
+  // const int NR_ITEMS=m;
+  // int i;
+  // int rank  = mpi_rank();
+  // int *bins;
+  // int buckets = 0;
+  // int remainder = 0;
+
+  // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  // bins = (int*) malloc(P * sizeof(int));
+
+  // // Splitting vector of size 'NR_ITEMS' across 'P' processors
+  // int nr_alloced = 0;
+  // for (i=0; i<P; i++) {
+  //   remainder = NR_ITEMS - nr_alloced;
+  //   buckets = (P - i);
+  //   bins[i] = remainder / buckets;
+  //   nr_alloced += bins[i];
+  // }
+
+  // // Compute start and end of each rank
+  // int start = 0;
+  // int end = 0;
+  // for (i=0; i<rank; i++)
+  //   start += bins[i];
+  // end = start + bins[rank];
+
+  // cout << "size(R" << rank << ") = "<< bins[rank] << " start[" << start << ","<< end << "]end" << endl;
+
+  // MPI_Finalize();
+  // exit(0);
+
+  // New stuff
+
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
@@ -796,10 +938,13 @@ int main(int argc, char *argv[]) {
 
   HSSMatrixMPI<double>* K = nullptr;
 
+  TaskTimer::t_begin = GET_TIME_NOW();
+  TaskTimer timer(string("compression"), 1);
   timer.start();
+  KernelMPI kernel_matrix
+    (data_train, d, h, lambda, hss_opts,
+     ctxt_all, nprow, npcol, nmpi, ninc, ACA);
 
-  KernelMPI kernel_matrix(data_train, d, h, lambda, hss_opts, ctxt_all, nmpi);
-  
   if (reorder != "natural")
     K = new HSSMatrixMPI<double>
       (cluster_tree, kernel_matrix, ctxt, kernel_matrix,
@@ -861,12 +1006,14 @@ int main(int argc, char *argv[]) {
     cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
          << Bchecknorm << endl;
 
+
   if (!mpi_rank())
     cout << "# Starting prediction step" << endl;
-  timer.start();
+
   double* prediction = new double[m];
   std::fill(prediction, prediction+m, 0.);
 
+  timer.start();
   if (kernel == 1) {
     if (wdist.active() && wdist.lcols() > 0)
 #pragma omp parallel for
@@ -904,14 +1051,11 @@ int main(int argc, char *argv[]) {
     double a = (prediction[i] - data_test_label[i]) / 2;
     incorrect_quant += (a > 0 ? a : -a);
   }
-
-  if (!mpi_rank())
+  if (!mpi_rank()) {
     cout << "# prediction time = " << timer.elapsed() << endl;
-
-  if (!mpi_rank())
     cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
          << endl << endl;
-
+  }
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;

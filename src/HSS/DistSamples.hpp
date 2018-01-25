@@ -32,7 +32,11 @@ namespace strumpack {
           Sc(Actxt, _hss.cols(), d) {
         _rgen->seed(R.prow(), R.pcol());
         R.random(*_rgen);
-        _Amult(R, Sr, Sc);
+	auto mem = hss.total_memory() / 1.0e9;
+	if (!mpi_rank())
+	  std::cout << "# Calling Amult, current HSS memory usage = "
+		    << mem << " GByte" << std::endl;
+	_Amult(R, Sr, Sc);
         _hss.to_block_row(R,  sub_Rr, leaf_R);
         sub_Rc = DenseM_t(sub_Rr);
         _hss.to_block_row(Sr, sub_Sr, leaf_Sr);
@@ -47,6 +51,10 @@ namespace strumpack {
         Rnew.random(*_rgen);
         DistM_t Srnew(Sr.ctxt(), n, dd);
         DistM_t Scnew(Sc.ctxt(), n, dd);
+	auto mem = _hss.total_memory() / 1.0e9;
+	if (!mpi_rank())
+	  std::cout << "# Calling Amult, current HSS memory usage = "
+		    << mem << " GByte" << std::endl;
         _Amult(Rnew, Srnew, Scnew);
         R.hconcat(Rnew);
         Sr.hconcat(Srnew);
