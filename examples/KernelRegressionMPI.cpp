@@ -630,7 +630,8 @@ public:
     const auto lrows = R.lrows();
     const auto B = DistM_t::default_MB;
     vector<vector<double>> sbuf(P);
-    { // global, local, proc
+    if (R.active()) {
+      // global, local, proc
       vector<tuple<int,int,int>> glp(lrows);
       {
 	vector<size_t> count(P);
@@ -652,14 +653,16 @@ public:
     double *rbuf = nullptr, **pbuf = nullptr;
     all_to_all_v(sbuf, rbuf, pbuf, MPI_COMM_WORLD);
     DenseM_t R1D(_Hrows, cols);
-    vector<int> src_c(cols);
-    for (int c=0; c<cols; c++)
-      src_c[c] = ((c / B) % _pcols) * _prows;
-    for (int r=0; r<_Hrows; r++) {
-      auto gr = _iHperm[r + _dist[rank]];
-      auto src_r = (gr / B) % _prows;
+    if (_Hrows) {
+      vector<int> src_c(cols);
       for (int c=0; c<cols; c++)
-        R1D(r, c) = *(pbuf[src_r + src_c[c]]++);
+	src_c[c] = ((c / B) % _pcols) * _prows;
+      for (int r=0; r<_Hrows; r++) {
+	auto gr = _iHperm[r + _dist[rank]];
+	auto src_r = (gr / B) % _prows;
+	for (int c=0; c<cols; c++)
+	  R1D(r, c) = *(pbuf[src_r + src_c[c]]++);
+      }
     }
     delete[] pbuf;
     delete[] rbuf;
@@ -674,7 +677,7 @@ public:
     const auto lcols = S.lcols();
     const auto lrows = S.lrows();
     vector<vector<double>> sbuf(P);
-    {
+    if (_Hrows) {
       vector<tuple<int,int,int>> glp(_Hrows);
       for (int r=0; r<_Hrows; r++) {
 	auto gr = _iHperm[r + _dist[rank]];
@@ -698,12 +701,14 @@ public:
     }
     double *rbuf = nullptr, **pbuf = nullptr;
     all_to_all_v(sbuf, rbuf, pbuf, MPI_COMM_WORLD);
-    for (int r=0; r<lrows; r++) {
-      auto gr = _Hperm[S.rowl2g(r)];
-      auto p = -1 + distance
-	(_dist.begin(), upper_bound(_dist.begin(), _dist.end(), gr));
-      for (int c=0; c<lcols; c++)
-	S(r,c) = *(pbuf[p]++);
+    if (S.active()) {
+      for (int r=0; r<lrows; r++) {
+	auto gr = _Hperm[S.rowl2g(r)];
+	auto p = -1 + distance
+	  (_dist.begin(), upper_bound(_dist.begin(), _dist.end(), gr));
+	for (int c=0; c<lcols; c++)
+	  S(r,c) = *(pbuf[p]++);
+      }
     }
     delete[] pbuf;
     delete[] rbuf;
@@ -716,7 +721,7 @@ public:
     auto starttime = MPI_Wtime();
     int Ncol = R.cols();
     {
-      DenseM_t S1D(_Hrows, R.cols());
+      DenseM_t S1D(_Hrows, Ncol);
       {
 	DenseM_t R1D = redistribute_2D_to_1D(R);
 	FC_GLOBAL_(h_matrix_apply,H_MATRIX_APPLY)
