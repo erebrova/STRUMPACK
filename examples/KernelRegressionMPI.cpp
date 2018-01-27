@@ -256,6 +256,7 @@ void k_means(int k, double *p, int n, int d, int *nc, double *labels) {
   while ((changes == true) and (iter < kmeans_max_it)) {
     // for each point, find the closest cluster center
     changes = false;
+#pragma omp parallel for
     for (int i = 0; i < n; i++) {
       double min_dist = dist(&p[i * d], center[0], d);
       cluster[i] = 0;
@@ -264,6 +265,7 @@ void k_means(int k, double *p, int n, int d, int *nc, double *labels) {
         if (dd <= min_dist) {
           min_dist = dd;
           if (c != cluster[i]) {
+#pragma omp atomic write
             changes = true;
           }
           cluster[i] = c;
@@ -276,12 +278,36 @@ void k_means(int k, double *p, int n, int d, int *nc, double *labels) {
       for (int j = 0; j < d; j++)
         center[c][j] = 0.;
     }
-    for (int i = 0; i < n; i++) {
-      auto c = cluster[i];
-      nc[c]++;
-      for (int j = 0; j < d; j++)
-        center[c][j] += p[i * d + j];
+
+#pragma omp parallel
+    {
+      double **my_center = new double*[k];
+      for (int i = 0; i < k; i++) {
+        my_center[i] = new double[d];
+        for (int j = 0; j < d; j++)
+          my_center[i][j] = 0.;
+      }
+#pragma omp for
+      for (int i = 0; i < n; i++) {
+        auto c = cluster[i];
+#pragma omp atomic
+        nc[c]++;
+        for (int j = 0; j < d; j++)
+          my_center[c][j] += p[i * d + j];
+      }
+
+#pragma omp critical
+      {
+        for (int i = 0; i < k; i++) {
+          for (int j = 0; j < d; j++)
+            center[i][j] += my_center[i][j];
+        }
+      }
+      for (int i = 0; i < k; i++)
+        delete[] my_center[i];
+      delete[] my_center;
     }
+
     for (int c = 0; c < k; c++)
       for (int j = 0; j < d; j++)
         center[c][j] /= nc[c];
