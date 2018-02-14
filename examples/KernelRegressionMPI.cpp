@@ -43,7 +43,7 @@ using namespace strumpack;
 using namespace strumpack::HSS;
 
 // uncomment this to do the slow, straightforward sampling
-//#define FAST_H_SAMPLING 1
+#define FAST_H_SAMPLING 1
 
 #if defined(FAST_H_SAMPLING)
 #if defined(_OPENMP)
@@ -864,7 +864,7 @@ int main(int argc, char *argv[]) {
 
   if (!mpi_rank())
     cout << "# usage: ./KernelRegressionMPI file d h kernel(1=Gauss,2=Laplace) "
-      "reorder(natural, 2means, kd, pca) lambda nmpi ninc ACA mode(velid, test)"
+      "reorder(natural, 2means, kd, pca) lambda nmpi ninc ACA mode(valid, test)"
          << endl;
   if (argc > 1)
     filename = string(argv[1]);
@@ -922,7 +922,7 @@ int main(int argc, char *argv[]) {
   if (!mpi_rank())
     cout << "# Preprocessing data..." << endl;
   timer.start();
-  
+
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
@@ -951,7 +951,7 @@ int main(int argc, char *argv[]) {
     (data_train, d, h, lambda, hss_opts,
      ctxt_all, nprow, npcol, nmpi, ninc, ACA);
 
-
+  auto f0_compress = strumpack::params::flops;
   if (reorder != "natural")
     K = new HSSMatrixMPI<double>
       (cluster_tree, kernel_matrix, ctxt, kernel_matrix,
@@ -983,14 +983,24 @@ int main(int argc, char *argv[]) {
     cout << "#HSS compression took " << timer.elapsed() << endl;
   total_time += timer.elapsed();
 
+  auto total_flops_compress = Allreduce
+    (strumpack::params::flops - f0_compress, MPI_SUM, MPI_COMM_WORLD);
+  if (!mpi_rank())
+    cout << "# compression flops = " << total_flops_compress << endl;
+
   // Starting factorization
   if (!mpi_rank())
     cout << "factorization start" << endl;
   timer.start();
+  auto f0_factor = strumpack::params::flops;
   auto ULV = K->factor();
   if (!mpi_rank())
     cout << "# factorization time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
+  auto total_flops_factor = Allreduce
+    (strumpack::params::flops - f0_factor, MPI_SUM, MPI_COMM_WORLD);
+  if (!mpi_rank())
+    cout << "# factorization flops = " << total_flops_factor << endl;
 
   DenseMatrix<double> B(n, 1, &data_train_label[0], n);
   DenseMatrix<double> weights(B);
