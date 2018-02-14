@@ -43,7 +43,7 @@ using namespace strumpack;
 using namespace strumpack::HSS;
 
 // uncomment this to do the slow, straightforward sampling
-#define FAST_H_SAMPLING 1
+//#define FAST_H_SAMPLING 1
 
 #if defined(FAST_H_SAMPLING)
 #if defined(_OPENMP)
@@ -860,10 +860,11 @@ int main(int argc, char *argv[]) {
   int ACA = 1; //1: aca_basic 2:aca_withrandomtests 3:aca_full
   int kernel = 1; // Gaussian=1, Laplace=2
   double total_time = 0.;
+  string mode("valid");
 
   if (!mpi_rank())
     cout << "# usage: ./KernelRegressionMPI file d h kernel(1=Gauss,2=Laplace) "
-      "reorder(natural, 2means, kd, pca) lambda nmpi ninc ACA"
+      "reorder(natural, 2means, kd, pca) lambda nmpi ninc ACA mode(velid, test)"
          << endl;
   if (argc > 1)
     filename = string(argv[1]);
@@ -883,6 +884,8 @@ int main(int argc, char *argv[]) {
     ninc = stoi(argv[8]);
   if (argc > 9)
     ACA = stoi(argv[9]);
+  if (argc > 10)
+    mode = string(argv[10]);
   if (!mpi_rank()) {
     cout << "# data dimension = " << d << endl;
     cout << "# kernel h = " << h << endl;
@@ -893,6 +896,7 @@ int main(int argc, char *argv[]) {
     cout << "# nmpi = " << nmpi << endl;
     cout << "# ninc = " << ninc << endl;
     cout << "# ACA = " << ACA << endl;
+    cout << "# validation/test = " << mode << endl;
   }
 
   TaskTimer::t_begin = GET_TIME_NOW();
@@ -903,11 +907,11 @@ int main(int argc, char *argv[]) {
   hss_opts.set_from_command_line(argc, argv);
 
   vector<double> data_train = write_from_file(filename + "_train.csv");
-  vector<double> data_test = write_from_file(filename + "_test.csv");
+  vector<double> data_test = write_from_file(filename + "_" + mode + ".csv");
   vector<double> data_train_label =
       write_from_file(filename + "_train_label.csv");
   vector<double> data_test_label =
-      write_from_file(filename + "_test_label.csv");
+      write_from_file(filename + "_" + mode + "_label.csv");
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
