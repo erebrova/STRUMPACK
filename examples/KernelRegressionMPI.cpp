@@ -1009,11 +1009,16 @@ int main(int argc, char *argv[]) {
 
   if (!mpi_rank())
     cout << "solve start" << endl;
+  auto f0_solve = strumpack::params::flops;
   timer.start();
   K->solve(ULV, wdist);
   if (!mpi_rank())
     cout << "# solve time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
+  auto total_flops_solve = Allreduce
+    (strumpack::params::flops - f0_solve, MPI_SUM, MPI_COMM_WORLD);
+  if (!mpi_rank())
+    cout << "# solve flops = " << total_flops_solve << endl;
   if (!mpi_rank())
     cout << "# total time (comp + fact): " << total_time << endl;
 
