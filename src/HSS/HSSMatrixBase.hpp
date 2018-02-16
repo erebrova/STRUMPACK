@@ -343,8 +343,11 @@ namespace strumpack {
       std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       bool was_not_compressed = !is_compressed();
       // TODO openmp parallel region, set _openmp_task_depth?
-      compress_recursive_original(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
-                                  lAelem, opts, w, dd, _openmp_task_depth);
+#pragma omp parallel
+#pragma omp single
+      compress_recursive_original
+        (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
+         lAelem, opts, w, dd, _openmp_task_depth);
       if (is_compressed()) {
         auto lctxt = RS.HSS().ctxt_loc();
         auto d = RS.sub_Rr.cols();
@@ -403,8 +406,9 @@ namespace strumpack {
       }
       bool was_not_compressed = !is_compressed();
       // TODO openmp parallel region, set _openmp_task_depth?
-      compress_level_original(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
-                              opts, w, dd, lvl, _openmp_task_depth);
+      compress_level_original
+        (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
+         opts, w, dd, lvl, _openmp_task_depth);
       if (w.lvl == lvl) {
         if (is_compressed()) {
           auto lctxt = RS.HSS().ctxt_loc();
@@ -464,6 +468,8 @@ namespace strumpack {
       std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       bool was_not_compressed = !is_compressed();
       // TODO openmp parallel region, set _openmp_task_depth?
+#pragma omp parallel
+#pragma omp single
       compress_recursive_stable
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
          lAelem, opts, w, d, dd, _openmp_task_depth);
@@ -646,6 +652,8 @@ namespace strumpack {
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkFactor<scalar_t>>
           (new WorkFactor<scalar_t>());
+#pragma omp parallel
+#pragma omp single
       factor_recursive
         (*(ULV._factors_seq), *(w.w_seq), isroot,
          partial, _openmp_task_depth);
@@ -672,6 +680,8 @@ namespace strumpack {
         w.w_seq = std::unique_ptr<WorkSolve<scalar_t>>
           (new WorkSolve<scalar_t>());
       // TODO start OpenMP parallel region!
+#pragma omp parallel
+#pragma omp single
       solve_fwd(*(ULV._factors_seq), b.sub, *(w.w_seq),
                 partial, isroot, _openmp_task_depth);
       w.z = DistM_t(b.ctxt_loc(), w.w_seq->z);
@@ -685,6 +695,8 @@ namespace strumpack {
       if (!active()) return;
       w.w_seq->x = w.x.gather();
       // TODO start OpenMP parallel region!
+#pragma omp parallel
+#pragma omp single
       solve_bwd(*(ULV._factors_seq), x.sub, *(w.w_seq),
                 isroot, _openmp_task_depth);
     }
